@@ -1,7 +1,18 @@
+# Проверка Mellow: тесты ядра на Linux + сборка для симулятора и снимки экранов на macOS.
 name: Verify
-on: [push, workflow_dispatch]
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: verify
+  cancel-in-progress: true
+
 jobs:
   domain:
     runs-on: ubuntu-latest
@@ -12,18 +23,123 @@ jobs:
         with:
           persist-credentials: false
       - run: swift test --package-path PivchikCore
+
   ios:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 35
+    env:
+      SCHEME: Mellow
+      BUNDLE_ID: dev.disify.pivchik
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - run: brew install xcodegen
-      - run: xcodegen generate
-      - run: xcodebuild -project Mellow.xcodeproj -scheme Mellow -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
-      - uses: actions/upload-artifact@v4
+
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
-          name: Mellow-simulator
-          path: build/Build/Products/Debug-iphonesimulator/Mellow.app
-          retention-days: 1
+          xcode-version: latest-stable
+
+      - name: Инструменты
+        run: |
+          xcodebuild -version
+          brew install xcodegen >/dev/null 2>&1 || brew install xcodegen
+
+      - name: Сборка для симулятора
+        run: |
+          set -o pipefail
+          xcodegen generate
+          xcodebuild build -project "$SCHEME.xcodeproj" -scheme "$SCHEME" -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build/dd \
+            CODE_SIGNING_ALLOWED=NO ARCHS=arm64 ONLY_ACTIVE_ARCH=YES > build-sim.log 2>&1 || {
+              grep -E "error:|Error:" build-sim.log | sort -u | head -120; tail -30 build-sim.log; exit 1; }
+          grep -E "warning:" build-sim.log | grep -v "PivchikCore" | sort -u | head -40 || true
+          ls build/dd/Build/Products/Debug-iphonesimulator/
+
+      - name: Симулятор
+        id: sim
+        timeout-minutes: 8
+        run: |
+          set -e
+          UDID=$(xcrun simctl create mellow-shots "iPhone 16" 2>/dev/null || true)
+          LIST=$(xcrun simctl list devices available)
+          [ -n "$UDID" ] || UDID=$(echo "$LIST" | grep -E "^ +iPhone 16 \(" | head -1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          [ -n "$UDID" ] || UDID=$(echo "$LIST" | grep -E "^ +iPhone 17 \(" | head -1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          [ -n "$UDID" ] || UDID=$(echo "$LIST" | grep -E "^ +iPhone .*\(" | tail -1 | sed -E 's/.*\(([0-9A-Fa-f-]{36})\).*/\1/')
+          xcrun simctl list devices | grep "$UDID"
+          echo "udid=$UDID" >> $GITHUB_OUTPUT
+          xcrun simctl boot "$UDID" || true
+          if ! perl -e 'alarm shift; exec @ARGV' 240 xcrun simctl bootstatus "$UDID" -b; then
+            xcrun simctl shutdown "$UDID" || true
+            xcrun simctl boot "$UDID"
+            perl -e 'alarm shift; exec @ARGV' 180 xcrun simctl bootstatus "$UDID" -b
+          fi
+          xcrun simctl status_bar "$UDID" override --time "9:41" --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl install "$UDID" build/dd/Build/Products/Debug-iphonesimulator/$SCHEME.app
+
+      - name: Снимки экранов
+        timeout-minutes: 15
+        run: |
+          UDID=${{ steps.sim.outputs.udid }}
+          mkdir -p shots
+          FAIL=0
+          to() { perl -e 'alarm shift; exec @ARGV' "$@"; }   # на macOS нет timeout
+          alive() { to 5 xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -F "UIKitApplication:$BUNDLE_ID" >/dev/null; }
+          shoot() { # имя, аргументы запуска
+            local name="$1"; shift
+            if to 60 xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID" "$@" >/dev/null; then
+              for i in $(seq 1 10); do alive && break; sleep 1; done
+              sleep 4
+            fi
+            if alive && to 15 xcrun simctl io "$UDID" screenshot "shots/$name.png" >/dev/null 2>&1; then
+              echo "ok   $name"
+            else
+              to 15 xcrun simctl io "$UDID" screenshot "shots/$name-CRASH.png" >/dev/null 2>&1 || true
+              echo "FAIL $name — приложение не работает (упало)"; FAIL=1
+            fi
+          }
+          shoot 00-empty-home -tod day
+          shoot 01-home -seedDemo -screen home -tod day
+          shoot 02-home-chart -seedDemo -screen home -tod day -anchor chart
+          shoot 03-home-evening -seedDemo -screen home -tod eve
+          shoot 04-diary -seedDemo -screen diary -tod day
+          shoot 05-diary-timeline -seedDemo -screen diary -tod day -anchor timeline
+          shoot 06-episode -seedDemo -screen episode -tod day
+          shoot 07-evening-sheet -seedDemo -screen evening -tod day
+          shoot 08-stories -seedDemo -screen stories -tod day
+          shoot 09-story -seedDemo -screen story -tod day
+          shoot 10-story-timeline -seedDemo -screen story -tod day -anchor timeline
+          shoot 11-practice -seedDemo -screen practice -tod day
+          shoot 12-practice-stats -seedDemo -screen practice -tod day -anchor stats
+          shoot 13-practice-body -seedDemo -screen practice-body -tod day
+          shoot 14-breath-before -seedDemo -screen breath-before -tod day
+          shoot 15-breath -seedDemo -screen breath -tod day
+          shoot 16-breath-after -seedDemo -screen breath -step after -tod day
+          shoot 17-breath-done -seedDemo -screen breath -step done -tod day
+          shoot 18-steps -seedDemo -screen steps -tod day
+          shoot 19-progress -seedDemo -screen progress -tod day
+          shoot 20-progress-causes -seedDemo -screen progress -tod day -anchor causes
+          shoot 21-progress-achievements -seedDemo -screen progress -tod day -anchor achievements
+          shoot 22-profile -seedDemo -screen profile -tod day
+          shoot 23-letters -seedDemo -screen letters -tod day
+          shoot 24-month -seedDemo -screen month -tod day
+          shoot 25-backup -seedDemo -screen backup -tod day
+          shoot 26-empty-progress -screen progress -tod day
+          shoot 27-empty-practice -screen practice -tod day
+          # белый/пустой экран сжимается в крошечный PNG — такие снимки помечаем
+          for f in shots/*.png; do
+            SZ=$(stat -f%z "$f")
+            if [ "$SZ" -lt 40000 ]; then echo "ПУСТОЙ ЭКРАН? $f ($SZ байт)"; FAIL=1; fi
+          done
+          mkdir -p shots/crashes
+          find "$HOME/Library/Logs/DiagnosticReports" -name "Mellow*" -newermt "-1 hour" -exec cp {} shots/crashes/ \; 2>/dev/null || true
+          for c in shots/crashes/*; do [ -f "$c" ] && { echo "=== $c"; head -90 "$c"; }; done
+          ls -la shots
+          exit $FAIL
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screens
+          path: shots
+          retention-days: 7
+          if-no-files-found: warn
