@@ -33,6 +33,10 @@ extension Color {
 
 /// Постоянные цвета макета v3.
 enum Theme {
+    /// PostScript-имя шрифта заголовков — единственное место, где оно задано.
+    /// Нет такого шрифта в сборке — заголовки идут системным жирным с плотным трекингом.
+    static let headingFontName = "MellowSans-Bold"
+
     static let ink = Color(hex: 0x1E1530)
     static let mint = Color(hex: 0xA9DCC6)
     static let pink = Color(hex: 0xF29AC4)
@@ -120,14 +124,13 @@ extension EnvironmentValues {
     }
 }
 
-/// Шрифты: заголовки — MellowGrotesk (если файл уже в сборке), иначе системный жирный; текст — Involve.
+/// Шрифты: заголовки — Theme.headingFontName (если файл есть в сборке), иначе системный жирный; текст — Involve.
 enum MFont {
-    static let displayName = "MellowGrotesk-Bold"
-    static let hasDisplay: Bool = UIFont(name: displayName, size: 12) != nil
+    static let hasDisplay: Bool = UIFont(name: Theme.headingFontName, size: 12) != nil
 
     static func display(_ size: CGFloat) -> Font {
         if hasDisplay {
-            return Font.custom(displayName, size: size, relativeTo: .title2)
+            return Font.custom(Theme.headingFontName, size: size, relativeTo: .title2)
         }
         let scaled = UIFontMetrics(forTextStyle: .title2).scaledValue(for: size)
         return Font.system(size: scaled, weight: .bold)
@@ -148,7 +151,7 @@ enum MFont {
 extension View {
     /// Заголовочный шрифт с плотным трекингом.
     func display(_ size: CGFloat) -> some View {
-        self.font(MFont.display(size)).tracking(-size * 0.035)
+        self.font(MFont.display(size)).tracking(-size * 0.01)
     }
 
     /// Текстовый шрифт Involve.

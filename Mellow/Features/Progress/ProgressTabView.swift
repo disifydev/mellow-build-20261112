@@ -263,13 +263,13 @@ struct ProgressTabView: View {
                 .font(.system(size: 78))
                 .foregroundStyle(LinearGradient(colors: [Color(hex: 0xFBE38E), Color(hex: 0xF4B64A)], startPoint: .topLeading, endPoint: .bottomTrailing))
                 .shadow(color: Color(hex: 0xE9A93A).opacity(0.4), radius: 10, x: 0, y: 8)
-                .rotation3DEffect(.degrees(spin ? 360 : 0), axis: (x: 0.1, y: 1, z: 0), perspective: 0.5)
+                .rotation3DEffect(.degrees(spin ? 28 : -28), axis: (x: 0.1, y: 1, z: 0), perspective: 0.5)
                 .frame(maxWidth: .infinity)
                 .frame(height: 110)
                 .accessibilityHidden(true)
                 .onAppear {
                     guard !reduceMotion else { return }
-                    withAnimation(.linear(duration: 9).repeatForever(autoreverses: false)) { spin = true }
+                    withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) { spin = true }
                 }
             Cap("За действия, а не за отсутствие тревоги.")
                 .frame(maxWidth: .infinity, alignment: .center)

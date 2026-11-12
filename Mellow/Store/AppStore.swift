@@ -32,6 +32,9 @@ final class AppStore: ObservableObject {
             s = AppStore.load(from: fileURL)
         }
         AppStore.normalize(&s)
+        let achievementsBefore = s.achievements.count
+        AppStore.award(&s)
+        let awardedAtLaunch = s.achievements.count != achievementsBefore
 
         let a = s.active()
         let th = AppStore.thresholds(in: a)
@@ -41,6 +44,7 @@ final class AppStore: ObservableObject {
         diary = DiaryItem.build(from: a)
         level = 3
         level = lastLevelToday() ?? 3
+        if awardedAtLaunch { scheduleSave() }
     }
 
     // MARK: Время и пояс
