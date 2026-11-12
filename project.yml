@@ -1,0 +1,24 @@
+name: Mellow
+options:
+  deploymentTarget:
+    iOS: "18.0"
+packages:
+  PivchikCore:
+    path: PivchikCore
+targets:
+  Mellow:
+    type: application
+    platform: iOS
+    sources: [Mellow]
+    dependencies:
+      - package: PivchikCore
+        product: PivchikDomain
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.disify.pivchik
+        INFOPLIST_KEY_CFBundleDisplayName: Mellow
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: 1
+        SWIFT_VERSION: "5.0"
+        CODE_SIGNING_ALLOWED: NO

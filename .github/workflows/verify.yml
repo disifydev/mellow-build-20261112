@@ -1,0 +1,29 @@
+name: Verify
+on: [push, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  domain:
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: swift test --package-path PivchikCore
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: brew install xcodegen
+      - run: xcodegen generate
+      - run: xcodebuild -project Mellow.xcodeproj -scheme Mellow -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Mellow-simulator
+          path: build/Build/Products/Debug-iphonesimulator/Mellow.app
+          retention-days: 1
