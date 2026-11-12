@@ -58,6 +58,11 @@ struct PracticeFlowView: View {
         if Launch.step != nil { before = 7 }
         start()
         if Launch.step == "after" || Launch.step == "done" { finish() }
+        if Launch.step != nil {
+            // Только для снимков: показываем сессию так, будто она прошла целиком.
+            activeSeconds = Double(seconds)
+            endedEarly = false
+        }
         if Launch.step == "done" {
             after = 2
             felt = .easier

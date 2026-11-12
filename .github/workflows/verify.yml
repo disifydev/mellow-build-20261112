@@ -83,17 +83,23 @@ jobs:
           mkdir -p shots
           FAIL=0
           to() { perl -e 'alarm shift; exec @ARGV' "$@"; }   # на macOS нет timeout
-          alive() { to 5 xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -F "UIKitApplication:$BUNDLE_ID" >/dev/null; }
+          alive() { # проверка с повторами: единичный сбой launchctl не считаем падением
+            for k in 1 2 3; do
+              to 8 xcrun simctl spawn "$UDID" launchctl list 2>/dev/null | grep -F "UIKitApplication:$BUNDLE_ID" >/dev/null && return 0
+              sleep 1
+            done
+            return 1
+          }
           shoot() { # имя, аргументы запуска
             local name="$1"; shift
             if to 60 xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID" "$@" >/dev/null; then
               for i in $(seq 1 10); do alive && break; sleep 1; done
               sleep 4
             fi
-            if alive && to 15 xcrun simctl io "$UDID" screenshot "shots/$name.png" >/dev/null 2>&1; then
+            if to 15 xcrun simctl io "$UDID" screenshot "shots/$name.png" >/dev/null 2>&1 && sleep 2 && alive; then
               echo "ok   $name"
             else
-              to 15 xcrun simctl io "$UDID" screenshot "shots/$name-CRASH.png" >/dev/null 2>&1 || true
+              [ -f "shots/$name.png" ] && mv "shots/$name.png" "shots/$name-CRASH.png"
               echo "FAIL $name — приложение не работает (упало)"; FAIL=1
             fi
           }
@@ -131,7 +137,8 @@ jobs:
             if [ "$SZ" -lt 40000 ]; then echo "ПУСТОЙ ЭКРАН? $f ($SZ байт)"; FAIL=1; fi
           done
           mkdir -p shots/crashes
-          find "$HOME/Library/Logs/DiagnosticReports" -name "Mellow*" -newermt "-1 hour" -exec cp {} shots/crashes/ \; 2>/dev/null || true
+          find "$HOME/Library/Logs/DiagnosticReports" "$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Logs/CrashReporter" \
+            -iname "Mellow*" -newermt "-1 hour" -exec cp {} shots/crashes/ \; 2>/dev/null || true
           for c in shots/crashes/*; do [ -f "$c" ] && { echo "=== $c"; head -90 "$c"; }; done
           ls -la shots
           exit $FAIL

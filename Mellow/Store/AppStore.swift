@@ -24,6 +24,7 @@ final class AppStore: ObservableObject {
             ?? FileManager.default.temporaryDirectory
         fileURL = dir.appendingPathComponent("mellow.json")
 
+        AppStore.removeExportFiles()
         var s = Snapshot()
         if demo {
             DemoData.fill(&s, now: Date())
@@ -328,6 +329,9 @@ final class AppStore: ObservableObject {
 
     /// Полное удаление всех данных. Встроенные практики создаются заново.
     func wipe() {
+        saveTask?.cancel()
+        AppStore.removeExportFiles()
+        AppStore.removeFiles(in: fileURL.deletingLastPathComponent(), prefix: "mellow-broken-")
         var s = Snapshot()
         AppStore.normalize(&s)
         level = 3
@@ -335,6 +339,19 @@ final class AppStore: ObservableObject {
     }
 
     // MARK: Файл
+
+    /// Временные файлы экспорта: удаляются после закрытия листа экспорта, при запуске и при удалении всех данных.
+    static func removeExportFiles() {
+        removeFiles(in: FileManager.default.temporaryDirectory, prefix: "mellow-backup-")
+    }
+
+    private static func removeFiles(in dir: URL, prefix: String) {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
+        for name in names where name.hasPrefix(prefix) && name.hasSuffix(".json") {
+            try? fm.removeItem(at: dir.appendingPathComponent(name))
+        }
+    }
 
     private static func load(from url: URL) -> Snapshot {
         guard let data = try? Data(contentsOf: url) else { return Snapshot() }
@@ -362,7 +379,7 @@ final class AppStore: ObservableObject {
         do {
             let data = try backupData()
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: fileURL, options: [.atomic])
+            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
         } catch {
             print("Mellow: не удалось сохранить данные: \(error)")
         }

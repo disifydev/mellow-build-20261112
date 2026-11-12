@@ -440,6 +440,27 @@ struct SheetScroll<Content: View>: View {
     }
 }
 
+/// Мягкая подложка под строкой состояния: прокрученный текст не залезает под часы и «островок».
+struct TopFade: View {
+    @Environment(\.palette) private var pal
+
+    var body: some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                LinearGradient(stops: [.init(color: pal.bg, location: 0),
+                                       .init(color: pal.bg.opacity(0.85), location: 0.6),
+                                       .init(color: pal.bg.opacity(0), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: geo.safeAreaInsets.top + 12)
+                Spacer(minLength: 0)
+            }
+            .ignoresSafeArea(edges: .top)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 /// Прокрутка вкладки с отступом под таббар; умеет прокрутить к блоку по аргументу -anchor.
 struct TabScroll<Content: View>: View {
     var bottom: CGFloat = 116
@@ -454,6 +475,7 @@ struct TabScroll<Content: View>: View {
                     .padding(.bottom, bottom)
             }
             .scrollDismissesKeyboard(.interactively)
+            .overlay(alignment: .top) { TopFade() }
             .onAppear {
                 guard let anchor = Launch.anchor else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {

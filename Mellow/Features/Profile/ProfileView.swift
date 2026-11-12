@@ -295,6 +295,10 @@ struct BackupSheet: View {
             Cap("Повторный импорт не создаёт дублей: записи сопоставляются по идентификатору, остаётся более свежая версия.")
         }
         .onAppear(perform: prepare)
+        .onDisappear {
+            AppStore.removeExportFiles()
+            fileURL = nil
+        }
         .fileImporter(isPresented: $importing, allowedContentTypes: [UTType.json]) { result in
             handle(result)
         }
@@ -304,7 +308,8 @@ struct BackupSheet: View {
         do {
             let data = try store.backupData()
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("mellow-backup-\(Fmt.fileDate.string(from: Date())).json")
-            try data.write(to: url, options: [.atomic])
+            // Файл копии шифруется системой, пока телефон заблокирован, и удаляется при закрытии листа.
+            try data.write(to: url, options: [.atomic, .completeFileProtection])
             fileURL = url
         } catch {
             fileURL = nil
