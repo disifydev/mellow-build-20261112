@@ -48,11 +48,11 @@ struct HeatMapCard: View {
                 ForEach(["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"], id: \.self) { n in
                     Text(n).txt(10.5, .semibold).foregroundStyle(pal.fg3)
                 }
-                ForEach(0..<lead, id: \.self) { _ in
-                    Color.clear.frame(height: 30)
+                ForEach(0..<lead, id: \.self) { i in
+                    Color.clear.frame(height: 30).id("lead-\(i)")
                 }
-                ForEach(0..<count, id: \.self) { i in
-                    cell(first.adding(days: i))
+                ForEach(LocalDay.range(from: first, to: first.adding(days: count - 1)), id: \.self) { day in
+                    cell(day)
                 }
             }
         }

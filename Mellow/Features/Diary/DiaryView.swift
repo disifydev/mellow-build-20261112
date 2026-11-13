@@ -117,11 +117,10 @@ struct DiaryView: View {
                 ForEach(["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"], id: \.self) { n in
                     Text(n).txt(11.5, .semibold).foregroundStyle(pal.fg3)
                 }
-                ForEach(0..<lead, id: \.self) { _ in
-                    Color.clear.frame(height: 32)
+                ForEach(0..<lead, id: \.self) { i in
+                    Color.clear.frame(height: 32).id("lead-\(i)")
                 }
-                ForEach(0..<count, id: \.self) { i in
-                    let d = first.adding(days: i)
+                ForEach(LocalDay.range(from: first, to: first.adding(days: count - 1)), id: \.self) { d in
                     Button { day = d } label: {
                         DayDot(day: d, size: 32, selected: d == selectedDay)
                     }

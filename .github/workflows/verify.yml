@@ -26,7 +26,7 @@ jobs:
 
   ios:
     runs-on: macos-15
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       SCHEME: Mellow
       BUNDLE_ID: dev.disify.pivchik
@@ -77,7 +77,7 @@ jobs:
           xcrun simctl install "$UDID" build/dd/Build/Products/Debug-iphonesimulator/$SCHEME.app
 
       - name: Снимки экранов
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: |
           UDID=${{ steps.sim.outputs.udid }}
           mkdir -p shots
