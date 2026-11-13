@@ -37,7 +37,7 @@ enum PDFReport {
                 for line in ReportText.summaryLines(data) { w.body(line) }
             }
             if let chart {
-                w.heading("Тревога по \(data.points.count > 10 ? "неделям" : "дням")")
+                w.heading(LocalDay.range(from: data.from, to: data.to).count > 31 ? "Тревога по неделям" : "Тревога по дням")
                 w.image(chart)
                 w.caption("Размер и высота бусины — средняя оценка. Пустой кружок — дней без записей.")
             }
