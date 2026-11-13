@@ -326,6 +326,7 @@ struct BackupSheet: View {
                     Cap("Добавится записей: \(preview.summary.added)")
                     Cap("Обновится: \(preview.summary.updated)")
                     Cap("Без изменений: \(preview.summary.unchanged)")
+                    if preview.summary.removed > 0 { Cap("Удалится (удалено в копии): \(preview.summary.removed)") }
                     CTAButton(title: "Применить импорт", small: true) {
                         store.applyImport(preview.merged)
                         self.preview = nil

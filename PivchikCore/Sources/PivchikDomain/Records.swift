@@ -7,13 +7,18 @@ public struct RecordMeta: Codable, Sendable, Hashable {
     public var updatedAt: Date
     public var deletedAt: Date?
     public var isTestData: Bool
+    /// Когда пользователь последний раз правил запись вручную (для подписи «изменено»).
+    /// В отличие от `updatedAt` не меняется от служебных обновлений. В старых копиях поля нет — это nil.
+    public var editedAt: Date?
 
-    public init(id: UUID = UUID(), createdAt: Date, updatedAt: Date? = nil, deletedAt: Date? = nil, isTestData: Bool = false) {
+    public init(id: UUID = UUID(), createdAt: Date, updatedAt: Date? = nil, deletedAt: Date? = nil, isTestData: Bool = false,
+                editedAt: Date? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.updatedAt = updatedAt ?? createdAt
         self.deletedAt = deletedAt
         self.isTestData = isTestData
+        self.editedAt = editedAt
     }
 
     public var isDeleted: Bool { deletedAt != nil }

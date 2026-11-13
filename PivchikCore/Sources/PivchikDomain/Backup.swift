@@ -77,6 +77,8 @@ public struct ImportSummary: Sendable, Equatable {
     public var added = 0
     public var updated = 0
     public var unchanged = 0
+    /// Сколько текущих записей будет удалено, потому что в копии они уже удалены.
+    public var removed = 0
 
     public init() {}
 }
@@ -84,19 +86,36 @@ public struct ImportSummary: Sendable, Equatable {
 public enum BackupMerger {
     /// Объединяет текущие данные с копией. Записи сопоставляются по `id`; при совпадении остаётся версия
     /// с более свежим `updatedAt`. Повторный импорт того же файла ничего не меняет.
+    /// Удаление сильнее правки: если запись удалена хотя бы с одной стороны, остаётся надгробие без текста —
+    /// старая копия не воскрешает удалённое, а удалённое в копии удаляется и здесь.
     public static func merge(current: Snapshot, incoming: Snapshot) -> (merged: Snapshot, summary: ImportSummary) {
         var summary = ImportSummary()
-        func mergeList<R: Record & Equatable>(_ old: [R], _ new: [R]) -> [R] {
+        func mergeList<R: Tombstonable>(_ old: [R], _ new: [R]) -> [R] {
             var byID: [UUID: Int] = [:]
             var out = old
             for (i, r) in old.enumerated() { byID[r.id] = i }
             for r in new {
                 if let i = byID[r.id] {
-                    if r.meta.updatedAt.timeIntervalSince(out[i].meta.updatedAt) > 0.001 { out[i] = r; summary.updated += 1 } else { summary.unchanged += 1 }
+                    let mine = out[i]
+                    if mine.meta.isDeleted {
+                        summary.unchanged += 1
+                    } else if r.meta.isDeleted {
+                        out[i] = r.tombstoned()
+                        summary.removed += 1
+                    } else if r.meta.updatedAt.timeIntervalSince(mine.meta.updatedAt) > 0.001 {
+                        out[i] = r
+                        summary.updated += 1
+                    } else {
+                        summary.unchanged += 1
+                    }
                 } else {
                     byID[r.id] = out.count
-                    out.append(r)
-                    summary.added += 1
+                    if r.meta.isDeleted {
+                        out.append(r.tombstoned())
+                    } else {
+                        out.append(r)
+                        summary.added += 1
+                    }
                 }
             }
             return out
@@ -117,6 +136,6 @@ public enum BackupMerger {
         m.achievements = mergeList(current.achievements, incoming.achievements)
         m.letters = mergeList(current.letters, incoming.letters)
         m.settings = mergeList(current.settings, incoming.settings)
-        return (m, summary)
+        return (m.purgingDeleted(), summary)
     }
 }
