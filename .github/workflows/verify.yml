@@ -103,8 +103,19 @@ jobs:
             to 30 xcrun simctl spawn "$UDID" log show --last 2m --style compact --predicate 'process == "Mellow"' 2>/dev/null | tail -40 > "shots/$name-log.txt" || true
             tail -25 "shots/$name-log.txt" || true
           }
-          shoot() { # имя, аргументы запуска
+          shoot() { # имя, аргументы запуска; одна повторная попытка — симулятор иногда «устаёт» к концу серии
             local name="$1"; shift
+            if attempt "$name" "$@"; then return 0; fi
+            echo "     $name: повтор после перезапуска приложения"
+            xcrun simctl terminate "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 || true
+            sleep 3
+            if attempt "$name" "$@"; then return 0; fi
+            echo "FAIL $name — приложение не работает (упало или зависло) и после повтора"; FAIL=1
+            diagnose "$name"
+          }
+          attempt() {
+            local name="$1"; shift
+            rm -f "shots/$name.png" "shots/$name-CRASH.png"
             if to 60 xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID" "$@" >/dev/null; then
               for i in $(seq 1 10); do alive && break; sleep 1; done
               sleep 4
@@ -113,8 +124,7 @@ jobs:
               echo "ok   $name"
             else
               [ -f "shots/$name.png" ] && mv "shots/$name.png" "shots/$name-CRASH.png"
-              echo "FAIL $name — приложение не работает (упало или зависло)"; FAIL=1
-              diagnose "$name"
+              return 1
             fi
           }
           shoot 22-profile -seedDemo -screen profile -tod day
