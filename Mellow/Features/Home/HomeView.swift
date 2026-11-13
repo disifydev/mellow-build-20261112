@@ -13,7 +13,7 @@ struct HomeView: View {
 
     var body: some View {
         TabScroll {
-            BigHeader(title: store.appleName.map { "Привет, \($0)." } ?? "Привет.", subtitle: "Как ты сейчас?") {
+            BigHeader(title: (Features.appleSignIn ? store.appleName : nil).map { "Привет, \($0)." } ?? "Привет.", subtitle: "Как ты сейчас?") {
                 RoundButton(icon: "person", label: "Профиль и настройки") { router.cover = .profile }
             }
             stage

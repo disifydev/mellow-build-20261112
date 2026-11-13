@@ -20,7 +20,7 @@ struct RootView: View {
         .modifier(CoverHost(cover: $router.cover))
         .onAppear {
             openLaunchScreen()
-            store.checkAppleCredential()
+            if Features.appleSignIn { store.checkAppleCredential() }
         }
     }
 

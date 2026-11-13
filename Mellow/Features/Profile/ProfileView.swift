@@ -22,7 +22,7 @@ struct ProfileView: View {
                 Spacer()
             }
             BigHeader(title: "Профиль", subtitle: "и настройки", size: 31)
-            accountGroup
+            if Features.appleSignIn { accountGroup }
             remindersGroup
             thresholdsGroup.id("thresholds")
             linksGroup

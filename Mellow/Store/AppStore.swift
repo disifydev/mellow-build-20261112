@@ -48,7 +48,7 @@ final class AppStore: ObservableObject {
         level = 3
         level = lastLevelToday() ?? 3
         if awardedAtLaunch { scheduleSave() }
-        loadAppleAccount()
+        if Features.appleSignIn { loadAppleAccount() }
     }
 
     // MARK: Время и пояс

@@ -133,8 +133,6 @@ jobs:
           shoot 30-summary -seedDemo -screen summary -tod day
           shoot 31-heatmap -seedDemo -screen heatmap -anchor heatmap -tod day
           shoot 32-progress-filter -seedDemo -screen progress-filter -tod day
-          shoot 33-profile-signed-in -seedDemo -screen profile -demoAccount -tod day
-          shoot 34-home-name -seedDemo -screen home -demoAccount -tod day
           shoot 00-empty-home -tod day
           shoot 01-home -seedDemo -screen home -tod day
           shoot 02-home-chart -seedDemo -screen home -tod day -anchor chart
