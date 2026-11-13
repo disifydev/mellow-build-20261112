@@ -18,7 +18,10 @@ struct RootView: View {
         }
         .modifier(SheetHost(sheet: $router.sheet))
         .modifier(CoverHost(cover: $router.cover))
-        .onAppear(perform: openLaunchScreen)
+        .onAppear {
+            openLaunchScreen()
+            store.checkAppleCredential()
+        }
     }
 
     @ViewBuilder
@@ -63,6 +66,9 @@ struct RootView: View {
             router.tab = .diary
             router.sheet = .newMenu
         case "backup": router.sheet = .backup
+        case "pdf": router.tab = .progress; router.sheet = .report
+        case "summary": router.tab = .progress; router.sheet = .summary
+        case "heatmap", "progress-filter": router.tab = .progress
         case "goals": router.sheet = .goals
         case "plan": router.sheet = .plan
         case "profile": router.cover = .profile
@@ -112,6 +118,8 @@ struct SheetBody: View {
         case .addWin(let history): AddWinSheet(historyID: history)
         case .goals: GoalsSheet()
         case .backup: BackupSheet()
+        case .report: ReportSheet()
+        case .summary: SummarySheet()
         case .newLetter: NewLetterSheet()
         case .message(let text, let cat): MessageSheet(text: text, cat: cat)
         }

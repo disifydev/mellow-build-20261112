@@ -8,20 +8,26 @@ struct ProgressTabView: View {
     @EnvironmentObject private var router: Router
     @Environment(\.palette) private var pal
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var period: Period = .week
+    @State private var period: Period = Launch.screen == "heatmap" ? .month : .week
+    @State private var filter = MeasurementFilter()
+    @State private var heatDay: LocalDay?
     @State private var selected: Int?
     @State private var spin = false
 
     var body: some View {
         let range = currentRange
-        let summary = store.summary(from: range.from, to: range.to)
+        let summary = DayAnalytics.summary(from: range.from, to: range.to, stats: stats)
         TabScroll {
             BigHeader(title: "Прогресс", subtitle: subtitle(summary)) {
-                RoundButton(icon: "doc", label: "Резервная копия и экспорт") { router.sheet = .backup }
+                RoundButton(icon: "doc.richtext", label: "Отчёт для психолога") { router.sheet = .report }
             }
             SegControl(items: [(Period.week, "Неделя"), (Period.month, "Месяц"), (Period.year, "Год"), (Period.all, "Всё время")], selection: $period)
-            ChartCard(title: chartTitle, points: points, delta: period == .week ? store.weekDelta() : nil,
+            filterChips
+            ChartCard(title: chartTitle, points: points, delta: period == .week && filter.isEmpty ? store.weekDelta() : nil,
                       isDay: period == .week, selected: $selected)
+            if period != .week {
+                HeatMapCard(months: heatMonths, stats: stats, selected: $heatDay).id("heatmap")
+            }
             tiles(summary).id("tiles")
             if summary.daysWithData > 0 {
                 Cap("Считаются только дни с записями. Без записей: \(Fmt.count(summary.daysWithoutData, "день", "дня", "дней")).")
@@ -34,9 +40,55 @@ struct ProgressTabView: View {
             winsCard.id("wins")
             links
             monthCard
-            CTAButton(title: "Резервная копия и импорт", icon: "doc") { router.sheet = .backup }
+            CTAButton(title: "Отчёт для психолога", icon: "doc.richtext") { router.sheet = .report }
+            HStack(spacing: 10) {
+                CTAButton(title: "Сводка для ChatGPT", small: true) { router.sheet = .summary }
+                CTAButton(title: "Копия JSON", small: true) { router.sheet = .backup }
+            }
         }
-        .onChange(of: period) { _, _ in selected = nil }
+        .onChange(of: period) { _, _ in selected = nil; heatDay = nil }
+        .onChange(of: filter) { _, _ in selected = nil }
+        .onAppear {
+            if Launch.screen == "progress-filter", let first = store.histories.first {
+                filter.historyIDs = [first.meta.id]
+            }
+        }
+    }
+
+    // MARK: Фильтры
+
+    /// Статистика дней с учётом фильтра — считает ядро (MeasurementFilter).
+    private var stats: [LocalDay: DayStats] { store.dayStats(filter: filter) }
+
+    private var filterChips: some View {
+        HScroll {
+            Chip(text: "все записи", isOn: filter.isEmpty) { filter = MeasurementFilter() }
+            ForEach(store.histories, id: \.meta.id) { h in
+                Chip(text: h.title, isOn: filter.historyIDs.contains(h.meta.id)) { toggle(&filter.historyIDs, h.meta.id) }
+            }
+            Chip(text: "утро", isOn: filter.dayParts.contains(.morning)) { toggle(&filter.dayParts, .morning) }
+            Chip(text: "день", isOn: filter.dayParts.contains(.day)) { toggle(&filter.dayParts, .day) }
+            Chip(text: "вечер", isOn: filter.dayParts.contains(.evening)) { toggle(&filter.dayParts, .evening) }
+            ForEach(store.allTags, id: \.self) { t in
+                Chip(text: "#\(t)", isOn: filter.tags.contains(t)) { toggle(&filter.tags, t) }
+            }
+        }
+    }
+
+    private func toggle<T: Hashable>(_ set: inout Set<T>, _ value: T) {
+        if set.contains(value) { set.remove(value) } else { set.insert(value) }
+    }
+
+    /// Месяцы для тепловой карты, новые сверху.
+    private var heatMonths: [LocalDay] {
+        let r = currentRange
+        var out: [LocalDay] = []
+        var cur = r.to.monthStart
+        while cur >= r.from.monthStart && out.count < 12 {
+            out.append(cur)
+            cur = cur.adding(days: -1).monthStart
+        }
+        return out
     }
 
     // MARK: Период
@@ -77,7 +129,7 @@ struct ProgressTabView: View {
     private func subtitle(_ s: PeriodSummary) -> String {
         guard let cur = s.averageOfDays else { return "пока без записей" }
         guard let prevRange = previousRange,
-              let prev = store.summary(from: prevRange.from, to: prevRange.to).averageOfDays else { return "твои записи" }
+              let prev = DayAnalytics.summary(from: prevRange.from, to: prevRange.to, stats: stats).averageOfDays else { return "твои записи" }
         if cur < prev - 0.3 { return "стало тише" }
         if cur > prev + 0.3 { return "было непросто" }
         return "ровно, как раньше"
@@ -88,14 +140,14 @@ struct ProgressTabView: View {
         let t = store.today
         switch period {
         case .week:
-            return store.dayPoints(from: t.adding(days: -6), to: t)
+            return store.dayPoints(from: t.adding(days: -6), to: t, stats: stats)
         case .month:
             var out: [BeadPoint] = []
             for i in 0..<5 {
                 let to = t.adding(days: -7 * (4 - i))
                 let from = to.adding(days: -6)
                 out.append(BeadPoint.period(i, label: "\(from.day)–\(to.day)", title: "\(from.shortTitle) – \(to.shortTitle)",
-                                            summary: store.summary(from: from, to: to), thresholds: store.thresholds))
+                                            summary: DayAnalytics.summary(from: from, to: to, stats: stats), thresholds: store.thresholds))
             }
             return out
         case .year, .all:
@@ -112,7 +164,7 @@ struct ProgressTabView: View {
                 let end = min(m.adding(days: m.daysInMonth - 1), t)
                 let name = Fmt.month.string(from: m.noon)
                 out.append(BeadPoint.period(i, label: String(name.prefix(3)), title: Fmt.capitalized(name),
-                                            summary: store.summary(from: m, to: end), thresholds: store.thresholds))
+                                            summary: DayAnalytics.summary(from: m, to: end, stats: stats), thresholds: store.thresholds))
             }
             return out
         }
@@ -121,7 +173,7 @@ struct ProgressTabView: View {
     // MARK: Плитки
 
     private func tiles(_ s: PeriodSummary) -> some View {
-        let prev = previousRange.map { store.summary(from: $0.from, to: $0.to) }
+        let prev = previousRange.map { DayAnalytics.summary(from: $0.from, to: $0.to, stats: stats) }
         let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
         let has = s.daysWithData > 0
         return LazyVGrid(columns: columns, spacing: 10) {

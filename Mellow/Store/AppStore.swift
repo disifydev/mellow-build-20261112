@@ -9,6 +9,9 @@ final class AppStore: ObservableObject {
     @Published private(set) var snapshot: Snapshot
     /// Текущий уровень на дуге главного экрана (от него зависит фон).
     @Published var level: Int
+    /// Необязательный вход через Apple (см. AppleAccount.swift).
+    @Published var appleUserID: String? = nil
+    @Published var appleName: String? = nil
 
     private(set) var active: Snapshot
     private(set) var dayStats: [LocalDay: DayStats]
@@ -45,6 +48,7 @@ final class AppStore: ObservableObject {
         level = 3
         level = lastLevelToday() ?? 3
         if awardedAtLaunch { scheduleSave() }
+        loadAppleAccount()
     }
 
     // MARK: Время и пояс
@@ -119,6 +123,26 @@ final class AppStore: ObservableObject {
     func summary(from: LocalDay, to: LocalDay) -> PeriodSummary {
         DayAnalytics.summary(from: from, to: to, stats: dayStats)
     }
+
+    /// Статистика дней с фильтром «Прогресса» (истории, теги, время суток). Пустой фильтр — общая статистика.
+    func dayStats(filter: MeasurementFilter) -> [LocalDay: DayStats] {
+        if filter.isEmpty { return dayStats }
+        return DayAnalytics.dayStats(snapshot: active, thresholds: thresholds, filter: filter)
+    }
+
+    /// Все теги из отметок и эпизодов — для фильтров.
+    var allTags: [String] {
+        var seen = Set<String>()
+        var out: [String] = []
+        for t in active.checkIns.flatMap({ $0.tags }) + active.episodes.flatMap({ $0.tags }) where !seen.contains(t.lowercased()) {
+            seen.insert(t.lowercased())
+            out.append(t)
+        }
+        return out
+    }
+
+    /// Начало дня в текущем поясе — граница периода для аналитики по датам.
+    func startDate(_ day: LocalDay) -> Date { day.startDate(zoneID: zone) }
 
     // MARK: Изменения
 
@@ -346,13 +370,15 @@ final class AppStore: ObservableObject {
 
     /// Временные файлы экспорта: удаляются после закрытия листа экспорта, при запуске и при удалении всех данных.
     static func removeExportFiles() {
-        removeFiles(in: FileManager.default.temporaryDirectory, prefix: "mellow-backup-")
+        let tmp = FileManager.default.temporaryDirectory
+        removeFiles(in: tmp, prefix: "mellow-backup-")
+        removeFiles(in: tmp, prefix: "mellow-report-", suffix: ".pdf")
     }
 
-    private static func removeFiles(in dir: URL, prefix: String) {
+    private static func removeFiles(in dir: URL, prefix: String, suffix: String = ".json") {
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
-        for name in names where name.hasPrefix(prefix) && name.hasSuffix(".json") {
+        for name in names where name.hasPrefix(prefix) && name.hasSuffix(suffix) {
             try? fm.removeItem(at: dir.appendingPathComponent(name))
         }
     }

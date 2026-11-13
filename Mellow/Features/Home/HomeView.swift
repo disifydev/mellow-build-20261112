@@ -14,7 +14,7 @@ struct HomeView: View {
 
     var body: some View {
         TabScroll {
-            BigHeader(title: "Привет.", subtitle: "Как ты сейчас?") {
+            BigHeader(title: store.appleName.map { "Привет, \($0)." } ?? "Привет.", subtitle: "Как ты сейчас?") {
                 RoundButton(icon: "person", label: "Профиль и настройки") { router.cover = .profile }
             }
             stage
@@ -228,8 +228,8 @@ struct ChartCard: View {
 
 extension AppStore {
     /// Точки по дням: день без записей остаётся пробелом.
-    func dayPoints(from: LocalDay, to: LocalDay) -> [BeadPoint] {
-        let series = DayAnalytics.series(from: from, to: to, stats: dayStats)
+    func dayPoints(from: LocalDay, to: LocalDay, stats: [LocalDay: DayStats]? = nil) -> [BeadPoint] {
+        let series = DayAnalytics.series(from: from, to: to, stats: stats ?? dayStats)
         var out: [BeadPoint] = []
         for (i, item) in series.enumerated() {
             out.append(BeadPoint.day(i, item.day, item.stats))

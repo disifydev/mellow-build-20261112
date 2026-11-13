@@ -128,6 +128,13 @@ jobs:
             fi
           }
           shoot 22-profile -seedDemo -screen profile -tod day
+          shoot 28-pdf -seedDemo -screen pdf -tod day
+          shoot 29-pdf-preview -seedDemo -screen pdf -step preview -tod day
+          shoot 30-summary -seedDemo -screen summary -tod day
+          shoot 31-heatmap -seedDemo -screen heatmap -anchor heatmap -tod day
+          shoot 32-progress-filter -seedDemo -screen progress-filter -tod day
+          shoot 33-profile-signed-in -seedDemo -screen profile -demoAccount -tod day
+          shoot 34-home-name -seedDemo -screen home -demoAccount -tod day
           shoot 00-empty-home -tod day
           shoot 01-home -seedDemo -screen home -tod day
           shoot 02-home-chart -seedDemo -screen home -tod day -anchor chart

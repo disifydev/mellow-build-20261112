@@ -37,6 +37,8 @@ enum SheetRoute: Identifiable {
     case addWin(UUID?)
     case goals
     case backup
+    case report
+    case summary
     case newLetter
     case message(String, String)
 
@@ -52,6 +54,8 @@ enum SheetRoute: Identifiable {
         case .addWin: return "addWin"
         case .goals: return "goals"
         case .backup: return "backup"
+        case .report: return "report"
+        case .summary: return "summary"
         case .newLetter: return "newLetter"
         case .message(let text, _): return "message-\(text.hashValue)"
         }

@@ -10,7 +10,10 @@ targets:
   Mellow:
     type: application
     platform: iOS
-    sources: [Mellow]
+    sources:
+      - path: Mellow
+        excludes:
+          - Mellow.entitlements
     dependencies:
       - package: PivchikCore
         product: PivchikDomain
@@ -37,5 +40,6 @@ targets:
         TARGETED_DEVICE_FAMILY: 1
         SWIFT_VERSION: "5.0"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Mellow/Mellow.entitlements
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         CODE_SIGNING_ALLOWED: NO

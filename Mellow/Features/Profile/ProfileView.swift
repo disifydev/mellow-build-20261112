@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AuthenticationServices
 import PivchikDomain
 
 struct ProfileView: View {
@@ -24,6 +25,7 @@ struct ProfileView: View {
                 CatImage(name: "PivHappy", width: 86)
                 BigHeader(title: "Профиль", subtitle: "и настройки", size: 31)
             }
+            accountGroup
             remindersGroup
             thresholdsGroup.id("thresholds")
             linksGroup
@@ -89,6 +91,47 @@ struct ProfileView: View {
         .card(16)
     }
 
+    /// Необязательный вход через Apple.
+    @ViewBuilder
+    private var accountGroup: some View {
+        if store.appleUserID != nil {
+            HStack(spacing: 12) {
+                Image(systemName: "person.crop.circle.badge.checkmark").font(.system(size: 20, weight: .medium)).frame(width: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(store.appleName.map { "Вход через Apple: \($0)" } ?? "Вход через Apple выполнен").txt(14.5)
+                    Cap("Записи хранятся на устройстве и к аккаунту не привязаны.")
+                }
+                Spacer(minLength: 4)
+                Chip(text: "Выйти", height: 32) { store.signOutApple() }
+            }
+            .card(16)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.fullName]
+                } onCompletion: { result in
+                    switch result {
+                    case .success(let auth):
+                        if let credential = auth.credential as? ASAuthorizationAppleIDCredential {
+                            store.signedInWithApple(credential)
+                            notice = nil
+                        }
+                    case .failure(let error):
+                        if (error as? ASAuthorizationError)?.code != .canceled {
+                            notice = "Не получилось войти через Apple. Можно попробовать позже — приложение работает и без входа."
+                        }
+                    }
+                }
+                .signInWithAppleButtonStyle(pal.isDark ? .white : .black)
+                .frame(height: 50)
+                .clipShape(Capsule())
+                .accessibilityLabel("Войти через Apple")
+                Cap("Необязательно. Нужно только чтобы приложение обращалось к тебе по имени. Записи остаются на устройстве.")
+            }
+            .card(16)
+        }
+    }
+
     private var thresholdsGroup: some View {
         let t = store.thresholds
         return VStack(alignment: .leading, spacing: 4) {
@@ -119,6 +162,10 @@ struct ProfileView: View {
 
     private var dataGroup: some View {
         VStack(spacing: 0) {
+            linkRow("doc.richtext", "Отчёт для психолога (PDF)") { sheet = .report }
+            rowDivider
+            linkRow("bubble.left.and.text.bubble.right", "Сводка для ChatGPT") { sheet = .summary }
+            rowDivider
             linkRow("doc", "Резервная копия и импорт") { sheet = .backup }
             rowDivider
             linkRow("trash", "Удалить все данные") { askDelete = true }
