@@ -20,7 +20,7 @@ struct LettersView: View {
                 RoundButton(icon: "plus", label: "Новое письмо") { sheet = .newLetter }
             }
             BigHeader(title: "Письма", subtitle: "себе в будущее")
-            CatImage(name: "PivRead", width: 150).frame(maxWidth: .infinity)
+            Emblem(name: "PivRead", width: 150).frame(maxWidth: .infinity)
             if letters.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Cap("Писем пока нет. Напиши себе несколько слов — письмо откроется в день, который ты выберешь.")

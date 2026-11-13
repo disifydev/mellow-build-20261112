@@ -272,7 +272,7 @@ struct EveningSheet: View {
             SheetScroll {
                 HStack(alignment: .top) {
                     BigHeader(title: "Итог дня", subtitle: day.longTitle, size: 30)
-                    CatImage(name: "PivSleep", width: 84)
+                    Emblem(name: "PivSleep", width: 84)
                 }
                 LevelCard(title: "Общее состояние", value: $overall, fallback: 3,
                           hint: "В среднюю дня эта оценка не входит — она показывается отдельно.")

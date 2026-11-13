@@ -407,7 +407,7 @@ struct ProgressTabView: View {
                 }
                 .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
-                CatImage(name: "PivRead", width: 76)
+                Emblem(name: "PivRead", width: 76)
             }
             .card()
         }
@@ -470,7 +470,7 @@ struct MonthReviewView: View {
             BigHeader(title: "Месяц", subtitle: "как я изменилась")
             if cur.daysWithData == 0 {
                 HStack(spacing: 12) {
-                    CatImage(name: "PivRead", width: 70)
+                    Emblem(name: "PivRead", width: 70)
                     Cap("Пока нет записей — можно начать с одной отметки.")
                 }
                 .card()
@@ -507,7 +507,7 @@ struct MonthReviewView: View {
                 }
                 .card()
             }
-            CatImage(name: "PivStar", width: 140).frame(maxWidth: .infinity)
+            Emblem(name: "PivStar", width: 140).frame(maxWidth: .infinity)
             Cap("Только цифры и твои записи. Выводы — твои.")
                 .frame(maxWidth: .infinity, alignment: .center)
         }

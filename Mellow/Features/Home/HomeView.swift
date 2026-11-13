@@ -7,7 +7,6 @@ struct HomeView: View {
     @Environment(\.palette) private var pal
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var feel: String?
-    @State private var breathing = false
     @State private var selectedBead: Int?
 
     private var info: LevelInfo { LevelInfo.of(store.level) }
@@ -18,7 +17,6 @@ struct HomeView: View {
                 RoundButton(icon: "person", label: "Профиль и настройки") { router.cover = .profile }
             }
             stage
-            levelRow
             feelings
             CTAButton(title: "Отметить состояние", trailingIcon: "arrow.right", action: mark)
             quickActions
@@ -32,60 +30,33 @@ struct HomeView: View {
         .onChange(of: store.level) { _, _ in feel = nil }
     }
 
-    // MARK: Кот в дуге
+    // MARK: Шкала с цифрой
 
     private var stage: some View {
         ZStack {
-            orb(50).offset(x: -140, y: -90)
-            orb(26).offset(x: 138, y: -80)
-            orb(36).offset(x: 140, y: 70)
             DialView(level: $store.level, haptics: store.settings.hapticsEnabled)
-            CatImage(name: info.cat, width: 172)
-                .shadow(color: Color(hex: 0x280A46).opacity(0.26), radius: 14, x: 0, y: 18)
-                .scaleEffect(breathing ? 1.03 : 1, anchor: .bottom)
-                .offset(y: 8)
-                .id(info.cat)
-                .transition(.scale(scale: 0.72).combined(with: .opacity))
-                .allowsHitTesting(false)
+            VStack(spacing: 2) {
+                Text("\(store.level)").display(104).monospacedDigit()
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.25), value: store.level)
+                H(info.name)
+                Cap(info.phrase)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 2)
+            }
+            .frame(maxWidth: 190)
+            .offset(y: 6)
+            .allowsHitTesting(false)
+            .accessibilityElement(children: .combine)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 292)
         .padding(.vertical, -8)
-        .animation(.spring(response: 0.45, dampingFraction: 0.65), value: info.cat)
-        .onAppear {
-            guard !reduceMotion else { return }
-            withAnimation(.easeInOut(duration: 2.3).repeatForever(autoreverses: true)) { breathing = true }
-        }
-    }
-
-    private func orb(_ size: CGFloat) -> some View {
-        Circle()
-            .fill(RadialGradient(colors: [Color.white.opacity(0.95), Color.white.opacity(0.22), Color.white.opacity(0.05)],
-                                 center: UnitPoint(x: 0.32, y: 0.28), startRadius: 0, endRadius: size * 0.72))
-            .overlay(Circle().strokeBorder(Color.white.opacity(0.5), lineWidth: 1))
-            .frame(width: size, height: size)
-            .accessibilityHidden(true)
-    }
-
-    private var levelRow: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            Text("\(store.level)").display(68).monospacedDigit()
-                .frame(minWidth: 44, alignment: .leading)
-                .contentTransition(.numericText())
-                .animation(.easeOut(duration: 0.25), value: store.level)
-            VStack(alignment: .leading, spacing: 4) {
-                H(info.name)
-                Cap(info.phrase)
-            }
-            .padding(.bottom, 6)
-            Spacer(minLength: 0)
-        }
-        .accessibilityElement(children: .combine)
     }
 
     private var feelings: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Cap("Уровень тревоги \(store.level) из 10. Что ближе всего?")
+            Cap("Что ближе всего?")
             HScroll {
                 ForEach(info.feels, id: \.self) { f in
                     Chip(text: f, isOn: feel == f) { feel = feel == f ? nil : f }
@@ -187,7 +158,7 @@ struct HomeView: View {
                     Cap("Что помогло, что было трудно, маленькая победа. " + (done ? "Заполнен — можно дополнить." : "Ещё не заполнен."))
                 }
                 Spacer(minLength: 0)
-                CatImage(name: "PivSleep", width: 74)
+                Emblem(name: "PivSleep", width: 74)
             }
             .card()
         }

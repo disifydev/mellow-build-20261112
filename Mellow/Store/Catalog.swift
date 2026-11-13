@@ -1,7 +1,7 @@
 import Foundation
 import PivchikDomain
 
-/// Подписи уровня тревоги, поза кота и подсказки чувств (таблица LV из макета).
+/// Подписи уровня тревоги, знак и подсказки чувств (таблица LV из макета).
 struct LevelInfo {
     let max: Int
     let name: String
@@ -12,13 +12,13 @@ struct LevelInfo {
     static let all: [LevelInfo] = [
         LevelInfo(max: 1, name: "полный покой", cat: "PivSleep", phrase: "Тихо. Побудем так.",
                   feels: ["спокойно", "расслаблена", "сонно", "тихо внутри"]),
-        LevelInfo(max: 3, name: "спокойно", cat: "PivCalm", phrase: "Ровный день. Я рядом.",
+        LevelInfo(max: 3, name: "спокойно", cat: "PivCalm", phrase: "Ровный день.",
                   feels: ["ровно", "чуть напряжена", "устала", "задумчива"]),
         LevelInfo(max: 5, name: "лёгкое беспокойство", cat: "PivTea", phrase: "Давай заметим это и выдохнем.",
                   feels: ["беспокойно", "не по себе", "раздражена", "грустно"]),
-        LevelInfo(max: 7, name: "тревожно", cat: "PivPeek", phrase: "Я рядом. Подышим вместе?",
+        LevelInfo(max: 7, name: "тревожно", cat: "PivPeek", phrase: "Может помочь дыхание.",
                   feels: ["тревожно", "накручиваю себя", "страшно", "злюсь"]),
-        LevelInfo(max: 10, name: "сильная тревога", cat: "PivLove", phrase: "Я с тобой. Сначала — один выдох.",
+        LevelInfo(max: 10, name: "сильная тревога", cat: "PivLove", phrase: "Сначала — один долгий выдох.",
                   feels: ["очень тревожно", "паника близко", "мысли не остановить", "сердце колотится"]),
     ]
 
@@ -206,7 +206,7 @@ extension AchievementType {
     }
 }
 
-/// Цвета и коты карточек историй — по порядку создания.
+/// Цвета и знаки карточек историй — по порядку создания.
 enum StoryLook {
     static let colors: [UInt32] = [0xC9B5F2, 0xF9D3A8, 0xB5E0CD, 0xF5B7D3, 0xB4C3F7]
     static let cats: [String] = ["PivPeek", "PivTea", "PivRead", "PivCalm", "PivHappy"]

@@ -142,7 +142,7 @@ struct PracticeFlowView: View {
                 Cap(p.type.isTimed ? "\(seconds / 60) мин" : "по шагам")
             }
             BigHeader(title: p.title, subtitle: "перед началом")
-            CatImage(name: p.type.info.cat, width: 170)
+            Emblem(name: p.type.info.cat, width: 170)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             LevelCard(title: "Тревога сейчас", value: $before, fallback: store.level,
                       hint: "Можно пропустить. Тогда сессия сохранится, но в расчёт изменений не войдёт.")
@@ -159,7 +159,7 @@ struct PracticeFlowView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
                 BigHeader(title: "Готово.", subtitle: "Как ты сейчас?")
-                CatImage(name: "PivLove", width: 150)
+                Emblem(name: "PivLove", width: 150)
                     .frame(maxWidth: .infinity)
                 LevelCard(title: "Тревога после", value: $after, fallback: 3)
                 SegControl(items: FeltResult.allCases.map { (Optional($0), $0.title) }, selection: $felt)
@@ -180,7 +180,7 @@ struct PracticeFlowView: View {
         return ZStack {
             VStack(alignment: .leading, spacing: 14) {
                 BigHeader(title: "Сохранено.", subtitle: (change ?? 0) > 0 ? "Стало тише" : "Ты это сделала")
-                CatImage(name: "PivStar", width: 190)
+                Emblem(name: "PivStar", width: 190)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 VStack(spacing: 6) {
                     if let change, let b = before, let a = after {
@@ -297,7 +297,7 @@ struct BreathRunView: View {
             HStack {
                 Cap("осталось \(left / 60):\(left % 60 < 10 ? "0" : "")\(left % 60)")
                 Spacer()
-                Cap("Пивчик дышит с тобой")
+                Cap("Дыши в своём ритме")
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -425,7 +425,7 @@ struct StepsRunView: View {
                     MField(title: "Мои слова", text: $texts[i], placeholder: "Можно пропустить", lines: 3)
                 }
             }
-            CatImage(name: practice.type.info.cat, width: 140)
+            Emblem(name: practice.type.info.cat, width: 140)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             HStack(spacing: 10) {
                 if i > 0 {

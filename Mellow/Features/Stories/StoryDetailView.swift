@@ -75,7 +75,7 @@ struct StoryDetailView: View {
                 }
             }
             if h.status == .easier || h.status == .resolved {
-                Cap("Пивчик: «Ты уже прошла большую часть пути по этой теме».")
+                Cap("Ты уже прошла большую часть пути по этой теме.")
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }

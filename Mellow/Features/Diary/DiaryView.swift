@@ -78,7 +78,7 @@ struct DiaryView: View {
             }
         } else {
             HStack(spacing: 12) {
-                CatImage(name: "PivRead", width: 64)
+                Emblem(name: "PivRead", width: 64)
                 Cap(selectedDay == store.today ? "Пока нет записей — можно начать с одной отметки." : "В этот день записей нет. Это пробел, а не спокойный день.")
                 Spacer(minLength: 0)
             }

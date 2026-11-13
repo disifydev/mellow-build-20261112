@@ -135,7 +135,7 @@ struct PracticeCard: View {
             Spacer(minLength: 4)
             Text(item.type.isTimed ? "с таймером" : "по шагам").txt(11.5, .semibold).opacity(0.7)
         }
-        .padding(.trailing, 120)
+        .padding(.trailing, 76)
         .foregroundStyle(Theme.ink)
         .padding(.horizontal, 18)
         .padding(.vertical, 16)
@@ -144,8 +144,8 @@ struct PracticeCard: View {
         .background(alignment: .bottomTrailing) {
             ZStack(alignment: .bottomTrailing) {
                 Color(hex: info.color)
-                CatImage(name: info.cat, width: 128)
-                    .offset(x: 6, y: 22)
+                Emblem(name: info.cat, width: 110)
+                    .padding(18)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))

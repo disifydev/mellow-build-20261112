@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Дуга 270° вокруг кота: уровень тревоги 0…10.
+/// Дуга 270° вокруг цифры: уровень тревоги 0…10.
 struct DialArc: Shape {
     var fraction: CGFloat
     var inset: CGFloat = 26

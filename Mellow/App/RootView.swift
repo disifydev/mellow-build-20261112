@@ -159,7 +159,7 @@ struct CoverBody: View {
     }
 }
 
-/// Короткое сообщение с котом.
+/// Короткое сообщение со знаком.
 struct MessageSheet: View {
     @Environment(\.dismiss) private var dismiss
     let text: String
@@ -168,7 +168,7 @@ struct MessageSheet: View {
     var body: some View {
         SheetScroll {
             HStack(spacing: 12) {
-                CatImage(name: cat, width: 86)
+                Emblem(name: cat, width: 86)
                 Text(text).txt(15).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }

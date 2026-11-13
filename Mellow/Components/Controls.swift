@@ -411,17 +411,39 @@ struct WinRow: View {
     }
 }
 
-/// Кот из набора ассетов.
-struct CatImage: View {
+/// Знак настроения: мягкий белый круг с символом. Заменил кота — без персонажа, чище.
+struct Emblem: View {
     let name: String
     var width: CGFloat
 
+    static func symbol(_ name: String) -> String {
+        switch name {
+        case "PivBreathe": return "wind"
+        case "PivCalm": return "leaf"
+        case "PivHappy": return "sun.max"
+        case "PivStar": return "star"
+        case "PivRead": return "book"
+        case "PivSleep": return "moon"
+        case "PivTea": return "cup.and.saucer"
+        case "PivLove": return "heart"
+        case "PivPeek": return "eye"
+        default: return "sparkle"
+        }
+    }
+
     var body: some View {
-        Image(name)
-            .resizable()
-            .scaledToFit()
-            .frame(width: width)
-            .accessibilityHidden(true)
+        let d = width * 0.62
+        ZStack {
+            Circle().fill(RadialGradient(colors: [Color.white.opacity(0.95), Color.white.opacity(0.5)],
+                                         center: UnitPoint(x: 0.32, y: 0.28), startRadius: 0, endRadius: d * 0.8))
+            Circle().strokeBorder(Color.white.opacity(0.75), lineWidth: 1)
+            Image(systemName: Self.symbol(name))
+                .font(.system(size: d * 0.34, weight: .medium))
+                .foregroundStyle(Theme.ink.opacity(0.75))
+        }
+        .frame(width: d, height: d)
+        .shadow(color: Color(hex: 0x280A46).opacity(0.12), radius: d * 0.12, x: 0, y: d * 0.08)
+        .accessibilityHidden(true)
     }
 }
 

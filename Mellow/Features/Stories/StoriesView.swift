@@ -38,7 +38,7 @@ struct StoriesView: View {
 
     private var empty: some View {
         VStack(spacing: 10) {
-            CatImage(name: "PivRead", width: 120)
+            Emblem(name: "PivRead", width: 120)
             H("Историй пока нет")
             Cap("История — это тема, которая повторяется. К ней можно привязывать эпизоды, разговоры и практики и видеть путь.")
                 .multilineTextAlignment(.center)
@@ -84,7 +84,7 @@ struct StoryCard: View {
                     Text(history.title).display(24)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.trailing, 110)
+                        .padding(.trailing, 76)
                     if !peaks.isEmpty { Spark(values: peaks) }
                 }
                 Spacer(minLength: 0)
@@ -92,7 +92,7 @@ struct StoryCard: View {
                     TagPill(text: history.status.title)
                     Text("с \(Fmt.dayMonth.string(from: history.startedAt)) · эпизодов \(episodes.count) · разговоров \(talks)")
                         .txt(12).opacity(0.66)
-                        .padding(.trailing, 110)
+                        .padding(.trailing, 76)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -102,8 +102,8 @@ struct StoryCard: View {
             .background(alignment: .bottomTrailing) {
                 ZStack(alignment: .bottomTrailing) {
                     Color(hex: StoryLook.colors[index % StoryLook.colors.count])
-                    CatImage(name: StoryLook.cats[index % StoryLook.cats.count], width: 132)
-                        .offset(x: 14, y: 16)
+                    Emblem(name: StoryLook.cats[index % StoryLook.cats.count], width: 110)
+                        .padding(18)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))

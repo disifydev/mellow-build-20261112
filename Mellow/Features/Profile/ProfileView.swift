@@ -21,10 +21,7 @@ struct ProfileView: View {
                 RoundButton(icon: "chevron.left", label: "Назад") { dismiss() }
                 Spacer()
             }
-            HStack(spacing: 12) {
-                CatImage(name: "PivHappy", width: 86)
-                BigHeader(title: "Профиль", subtitle: "и настройки", size: 31)
-            }
+            BigHeader(title: "Профиль", subtitle: "и настройки", size: 31)
             accountGroup
             remindersGroup
             thresholdsGroup.id("thresholds")
@@ -266,7 +263,7 @@ struct HelpView: View {
                 Spacer()
             }
             BigHeader(title: "Срочная помощь", subtitle: "ты не одна", size: 31)
-            CatImage(name: "PivLove", width: 150).frame(maxWidth: .infinity)
+            Emblem(name: "PivLove", width: 150).frame(maxWidth: .infinity)
             VStack(alignment: .leading, spacing: 10) {
                 Text("Mellow — дневник и инструменты самопомощи. Он не заменяет врача или психолога и не ставит диагнозов.")
                     .txt(15).fixedSize(horizontal: false, vertical: true)
