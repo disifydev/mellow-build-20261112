@@ -46,6 +46,9 @@ struct LettersView: View {
                     Image(systemName: "envelope.open").font(.system(size: 16, weight: .medium))
                 }
                 Text("«\(letter.body)»").txt(14.5).fixedSize(horizontal: false, vertical: true)
+                Chip(text: "удалить", height: 30) {
+                    store.delete([letter.meta.id], label: "Письмо удалено")
+                }
             }
             .card()
         } else if letter.isUnlocked(at: now) {
@@ -71,9 +74,12 @@ struct LettersView: View {
                     Image(systemName: "lock").font(.system(size: 16, weight: .medium))
                 }
                 Cap("Написано \(Fmt.dayMonth.string(from: letter.meta.createdAt)). До открытия \(Fmt.count(days, "день", "дня", "дней")).")
-                Chip(text: "отменить письмо", height: 30) {
-                    Notifier.cancelLetter(id: letter.meta.id)
-                    store.update(\Snapshot.letters, id: letter.meta.id) { $0.canceledAt = Date() }
+                HStack(spacing: 8) {
+                    Chip(text: "изменить", height: 30) { sheet = .editLetter(letter.meta.id) }
+                    Chip(text: "отменить письмо", height: 30) {
+                        Notifier.cancelLetter(id: letter.meta.id)
+                        store.update(\Snapshot.letters, id: letter.meta.id) { $0.canceledAt = Date() }
+                    }
                 }
             }
             .card()
@@ -88,6 +94,14 @@ struct NewLetterSheet: View {
     @State private var text = ""
     @State private var unlock = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
     @State private var remind = true
+    @State private var loaded = false
+    var editID: UUID? = nil
+
+    init(editID: UUID? = nil) { self.editID = editID }
+
+    private var record: FutureLetterRecord? {
+        editID.flatMap { id in store.active.letters.first { $0.meta.id == id } }
+    }
 
     private var minDate: Date {
         Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date())) ?? Date()
@@ -99,19 +113,26 @@ struct NewLetterSheet: View {
 
     var body: some View {
         SheetScroll {
-            BigHeader(title: "Письмо", subtitle: "себе в будущее", size: 30)
+            BigHeader(title: "Письмо", subtitle: editID == nil ? "себе в будущее" : "изменить", size: 30)
             MField(title: "Текст письма", text: $text, placeholder: "Привет. Когда ты это прочитаешь…", lines: 5)
             DateRow(title: "Когда открыть", date: $unlock, range: minDate...maxDate, components: [.date])
-            Toggle(isOn: $remind) { Text("Напомнить в этот день").txt(14.5) }
-                .tint(Theme.mint)
-                .padding(.horizontal, 14)
-                .frame(minHeight: 50)
-                .glass(18)
-            Cap("В уведомлении текста письма не будет.")
-            CTAButton(title: "Запечатать письмо", icon: "lock") {
+            if editID == nil {
+                Toggle(isOn: $remind) { Text("Напомнить в этот день").txt(14.5) }
+                    .tint(Theme.mint)
+                    .padding(.horizontal, 14)
+                    .frame(minHeight: 50)
+                    .glass(18)
+                Cap("В уведомлении текста письма не будет.")
+            }
+            CTAButton(title: editID == nil ? "Запечатать письмо" : "Сохранить изменения", icon: editID == nil ? "lock" : nil) {
                 guard let body = text.nilIfEmpty else { return }
                 let day = Calendar.current.startOfDay(for: unlock)
                 let at = Calendar.current.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
+                if let r = record {
+                    store.updateLetter(r.meta.id, body: body, unlockAt: at)
+                    dismiss()
+                    return
+                }
                 let id = store.addLetter(body: body, unlockAt: at)
                 if remind && !store.isDemo {
                     Notifier.requestPermission { granted in
@@ -121,6 +142,13 @@ struct NewLetterSheet: View {
                 dismiss()
             }
             .opacity(text.trimmed.isEmpty ? 0.5 : 1)
+        }
+        .onAppear {
+            guard !loaded else { return }
+            loaded = true
+            guard let r = record else { return }
+            text = r.body
+            unlock = max(r.unlockAt, minDate)
         }
     }
 }
