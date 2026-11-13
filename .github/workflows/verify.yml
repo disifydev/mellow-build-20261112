@@ -139,6 +139,10 @@ jobs:
           shoot 03-home-evening -seedDemo -screen home -tod eve
           shoot 04-diary -seedDemo -screen diary -tod day
           shoot 05-diary-timeline -seedDemo -screen diary -tod day -anchor timeline
+          shoot 33-edit-checkin -seedDemo -screen edit-checkin -tod day
+          shoot 34-diary-swipe -seedDemo -screen diary-swipe -tod day -anchor timeline
+          shoot 35-diary-undo -seedDemo -screen diary-undo -tod day -anchor timeline
+          shoot 36-diary-select -seedDemo -screen diary-select -tod day -anchor timeline
           shoot 06-episode -seedDemo -screen episode -tod day
           shoot 07-evening-sheet -seedDemo -screen evening -tod day
           shoot 08-stories -seedDemo -screen stories -tod day

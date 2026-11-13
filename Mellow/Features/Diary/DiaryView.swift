@@ -19,7 +19,7 @@ struct DiaryView: View {
 
     var body: some View {
         TabScroll {
-            BigHeader(title: "Дневник", subtitle: "\(selectedDay.longTitle), \(selectedDay.weekdayShort.lowercased())") {
+            BigHeader(title: "Дневник", subtitle: selectedDay.longTitle) {
                 RoundButton(icon: "square.stack.3d.up", label: "Истории") { withAnimation { router.tab = .stories } }
                 RoundButton(icon: "plus", label: "Новая запись") {
                     router.composeDay = selectedDay == store.today ? nil : selectedDay
