@@ -12,14 +12,18 @@ struct DiaryView: View {
     @State private var filter: Filter = .all
     @State private var day: LocalDay?
     @State private var query = ""
-    @State private var pendingDelete: DiaryItem?
+    @State private var selecting = Launch.screen == "diary-select"
+    @State private var selected: Set<UUID> = []
 
     private var selectedDay: LocalDay { day ?? router.diaryDay ?? store.today }
 
     var body: some View {
         TabScroll {
             BigHeader(title: "Дневник", subtitle: "\(selectedDay.longTitle), \(selectedDay.weekdayShort.lowercased())") {
-                RoundButton(icon: "plus", label: "Новая запись") { router.sheet = .newMenu }
+                RoundButton(icon: "plus", label: "Новая запись") {
+                    router.composeDay = selectedDay == store.today ? nil : selectedDay
+                    router.sheet = .newMenu
+                }
             }
             SegControl(items: [(Mode.day, "День"), (Mode.week, "Неделя"), (Mode.month, "Месяц")], selection: $mode)
             switch mode {
@@ -41,17 +45,23 @@ struct DiaryView: View {
         .onChange(of: router.diaryDay) { _, new in
             if let new { day = new }
         }
-        .onDisappear { router.diaryDay = nil }
-        .confirmationDialog("Удалить запись?", isPresented: Binding(get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }),
-                            titleVisibility: .visible) {
-            Button("Удалить", role: .destructive) {
-                if let item = pendingDelete { delete(item) }
-                pendingDelete = nil
-            }
-            Button("Отмена", role: .cancel) { pendingDelete = nil }
-        } message: {
-            Text("Запись исчезнет из дневника, а статистика пересчитается.")
+        .onDisappear {
+            router.diaryDay = nil
+            router.composeDay = nil
         }
+        .onChange(of: selectedDay) { _, _ in selected = [] }
+        .onAppear {
+            if Launch.screen == "diary-select" { selected = Set(items.prefix(2).map { $0.id }) }
+        }
+        .overlay(alignment: .bottom) {
+            if selecting {
+                selectionBar
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 86)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.25), value: selecting)
     }
 
     private func chip(_ title: String, _ value: Filter) -> some View {
@@ -182,28 +192,66 @@ struct DiaryView: View {
     private var timeline: some View {
         let list = items
         let searching = !query.trimmed.isEmpty
-        if list.isEmpty {
-            Cap(searching ? "Ничего не найдено." : (filter == .all ? "В этот день записей нет." : "Таких записей в этот день нет."))
-        } else {
-            VStack(alignment: .leading, spacing: 10) {
-                ForEach(searching ? Array(list.reversed()) : list) { item in
-                    DiaryRow(item: item, showDate: searching) { pendingDelete = item }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                H(searching ? "Найдено" : "Записи")
+                Spacer()
+                if !list.isEmpty || selecting {
+                    Chip(text: selecting ? "Готово" : "Выбрать", isOn: selecting, height: 32) {
+                        selecting.toggle()
+                        selected = []
+                    }
+                }
+            }
+            if list.isEmpty {
+                Cap(searching ? "Ничего не найдено." : (filter == .all ? "В этот день записей нет." : "Таких записей в этот день нет."))
+            } else {
+                let rows = searching ? Array(list.reversed()) : list
+                ForEach(rows) { item in
+                    SwipeToDelete(startOpen: Launch.screen == "diary-swipe" && item.id == rows.first?.id, enabled: !selecting,
+                                  onTap: { tap(item) }, onDelete: { store.delete([item.id]) }) {
+                        DiaryRow(item: item, showDate: searching, selecting: selecting, isSelected: selected.contains(item.id))
+                    }
+                    .id(item.id)
+                }
+                if !selecting {
+                    Cap("Нажми на запись, чтобы изменить. Смахни влево, чтобы удалить.")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 2)
                 }
             }
         }
     }
 
-    private func delete(_ item: DiaryItem) {
-        switch item.kind {
-        case .checkIn: store.softDelete(\Snapshot.checkIns, id: item.id)
-        case .episode: store.softDelete(\Snapshot.episodes, id: item.id)
-        case .conversation: store.softDelete(\Snapshot.conversations, id: item.id)
-        case .session: store.softDelete(\Snapshot.sessions, id: item.id)
+    private func tap(_ item: DiaryItem) {
+        if selecting {
+            if selected.contains(item.id) { selected.remove(item.id) } else { selected.insert(item.id) }
+            Haptics.tick(store.settings.hapticsEnabled)
+        } else {
+            router.sheet = .edit(item)
+        }
+    }
+
+    private var selectionBar: some View {
+        HStack(spacing: 10) {
+            CTAButton(title: "Отмена", small: true) {
+                selecting = false
+                selected = []
+            }
+            .frame(width: 120)
+            CTAButton(title: selected.isEmpty ? "Выбери записи" : "Удалить: \(selected.count)", icon: "trash", small: true) {
+                guard !selected.isEmpty else { return }
+                store.delete(selected)
+                selected = []
+                selecting = false
+            }
+            .opacity(selected.isEmpty ? 0.55 : 1)
         }
     }
 
     private var eveningCard: some View {
-        let done = store.reflection(on: selectedDay) != nil
+        let reflection = store.reflection(on: selectedDay)
+        let done = reflection != nil
         return Button {
             router.sheet = .evening(selectedDay)
         } label: {
@@ -211,7 +259,8 @@ struct DiaryView: View {
                 Image(systemName: "moon").font(.system(size: 19, weight: .medium))
                 VStack(alignment: .leading, spacing: 4) {
                     H("Итог дня")
-                    Cap(done ? "Заполнен. Можно открыть и дополнить." : "Общее состояние, что помогло, что было трудно")
+                    Cap(done ? "Заполнен. Можно открыть и изменить." : "Общее состояние, что помогло, что было трудно")
+                    if let edited = reflection?.meta.editedAt { Cap(Fmt.edited(edited)) }
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold)).opacity(0.6)
@@ -222,16 +271,17 @@ struct DiaryView: View {
     }
 }
 
-/// Строка ленты: время, оценка, текст, история, теги, удаление.
+/// Строка ленты: время, оценка, текст, история, теги, подпись «изменено». В режиме выбора — кружок-отметка.
 struct DiaryRow: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.palette) private var pal
     let item: DiaryItem
     var showDate: Bool = false
-    var onDelete: () -> Void
+    var selecting: Bool = false
+    var isSelected: Bool = false
 
     private var tint: Color {
-        guard let v = item.value else { return Theme.lav }
+        guard let v = item.value else { return item.kind == .win ? Theme.mint : Theme.lav }
         let t = store.thresholds
         if v >= t.anxious { return Theme.pink }
         if v <= t.calm { return Theme.mint }
@@ -248,9 +298,24 @@ struct DiaryRow: View {
             }
             .frame(width: 40, alignment: .trailing)
             .padding(.top, 14)
-            Circle().fill(tint).frame(width: 10, height: 10).padding(.top, 16)
+            if selecting {
+                ZStack {
+                    Circle().fill(isSelected ? pal.on : Color.clear)
+                    Circle().strokeBorder(isSelected ? Color.clear : pal.fg2, lineWidth: 1.5)
+                    if isSelected {
+                        Image(systemName: "checkmark").font(.system(size: 10, weight: .heavy)).foregroundStyle(pal.onFg)
+                    }
+                }
+                .frame(width: 22, height: 22)
+                .padding(.top, 10)
+            } else {
+                Circle().fill(tint).frame(width: 10, height: 10).padding(.top, 16)
+            }
             content
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selecting && isSelected ? .isSelected : [])
+        .accessibilityHint(selecting ? "Выбрать для удаления" : "Открыть и изменить")
     }
 
     private var content: some View {
@@ -263,7 +328,9 @@ struct DiaryRow: View {
                     if !item.trailing.isEmpty { Cap(item.trailing) }
                 }
                 Text(item.note).txt(12.5).fixedSize(horizontal: false, vertical: true)
-                if item.retro { Cap("добавлено задним числом") }
+                if item.retro || item.edited != nil {
+                    Cap([item.retro ? "добавлено задним числом" : nil, item.edited.map { Fmt.edited($0) }].compactMap { $0 }.joined(separator: " · "))
+                }
                 if !item.stories.isEmpty || !item.tags.isEmpty {
                     FlowLayout(spacing: 6) {
                         ForEach(item.stories, id: \.self) { TagPill(text: $0) }
@@ -274,14 +341,13 @@ struct DiaryRow: View {
                     .padding(.top, 4)
                 }
             }
-            Button(action: onDelete) {
-                Image(systemName: "trash").font(.system(size: 14, weight: .medium)).opacity(0.45)
-                    .frame(width: 30, height: 30)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Удалить запись")
         }
         .card(13, radius: 22)
+        .overlay {
+            if selecting && isSelected {
+                RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(pal.fg.opacity(0.6), lineWidth: 2)
+            }
+        }
     }
 
     private var badge: some View {
@@ -289,11 +355,19 @@ struct DiaryRow: View {
             if let v = item.value {
                 Text("\(v)").display(18)
             } else {
-                Image(systemName: item.kind == .conversation ? "bubble.left" : "wind").font(.system(size: 16, weight: .semibold))
+                Image(systemName: icon).font(.system(size: 16, weight: .semibold))
             }
         }
         .foregroundStyle(Theme.ink)
         .frame(width: 40, height: 40)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(tint))
+    }
+
+    private var icon: String {
+        switch item.kind {
+        case .conversation: return "bubble.left"
+        case .win: return "checkmark"
+        default: return "wind"
+        }
     }
 }

@@ -1,10 +1,10 @@
 import Foundation
 import PivchikDomain
 
-/// Строка ленты дневника: отметка, эпизод, разговор или сессия практики.
+/// Строка ленты дневника: отметка, эпизод, разговор, сессия практики или маленькая победа.
 struct DiaryItem: Identifiable {
     enum Kind: String {
-        case checkIn, episode, conversation, session
+        case checkIn, episode, conversation, session, win
 
         var title: String {
             switch self {
@@ -12,6 +12,7 @@ struct DiaryItem: Identifiable {
             case .episode: return "Эпизод"
             case .conversation: return "Разговор с ИИ"
             case .session: return "Практика"
+            case .win: return "Победа"
             }
         }
     }
@@ -26,6 +27,8 @@ struct DiaryItem: Identifiable {
     let stories: [String]
     let tags: [String]
     let retro: Bool
+    /// Когда запись правили вручную (подпись «изменено»).
+    let edited: Date?
     /// Всё, по чему идёт поиск, в нижнем регистре.
     let haystack: String
 
@@ -42,7 +45,7 @@ struct DiaryItem: Identifiable {
             let st = names(c.historyIDs)
             let note = c.note ?? ""
             out.append(DiaryItem(id: c.meta.id, kind: .checkIn, date: c.observedAt, day: LocalDay(date: c.observedAt, zoneID: c.zoneID),
-                                 value: c.anxiety, note: note, trailing: "", stories: st, tags: c.tags, retro: c.isRetrospective,
+                                 value: c.anxiety, note: note, trailing: "", stories: st, tags: c.tags, retro: c.isRetrospective, edited: c.meta.editedAt,
                                  haystack: hay([Kind.checkIn.title, note] + st + c.tags)))
         }
         for e in a.episodes {
@@ -51,7 +54,7 @@ struct DiaryItem: Identifiable {
             let note = e.cause ?? e.thoughts ?? "Без описания"
             let dur = e.duration.map { Fmt.duration($0) } ?? "продолжается"
             out.append(DiaryItem(id: e.meta.id, kind: .episode, date: e.startedAt, day: LocalDay(date: e.startedAt, zoneID: e.zoneID),
-                                 value: e.peak, note: note, trailing: dur, stories: st, tags: e.tags, retro: e.isRetrospective,
+                                 value: e.peak, note: note, trailing: dur, stories: st, tags: e.tags, retro: e.isRetrospective, edited: e.meta.editedAt,
                                  haystack: hay([Kind.episode.title] + text + st + e.tags + e.bodySymptoms)))
         }
         for c in a.conversations {
@@ -61,7 +64,7 @@ struct DiaryItem: Identifiable {
             if let b = r.before, let af = r.after { trailing = "\(b) → \(af)" }
             let note = c.summary ?? c.insights ?? "Без описания"
             out.append(DiaryItem(id: c.meta.id, kind: .conversation, date: c.occurredAt, day: LocalDay(date: c.occurredAt, zoneID: c.zoneID),
-                                 value: nil, note: note, trailing: trailing, stories: st, tags: [], retro: c.isRetrospective,
+                                 value: nil, note: note, trailing: trailing, stories: st, tags: [], retro: c.isRetrospective, edited: c.meta.editedAt,
                                  haystack: hay([Kind.conversation.title, c.summary ?? "", c.insights ?? "", c.pastedText ?? ""] + st)))
         }
         for s in a.sessions where s.status != .running {
@@ -74,8 +77,14 @@ struct DiaryItem: Identifiable {
             var trailing = ""
             if let b = s.before, let af = s.after { trailing = "\(b) → \(af)" }
             out.append(DiaryItem(id: s.meta.id, kind: .session, date: s.startedAt, day: LocalDay(date: s.startedAt, zoneID: s.zoneID),
-                                 value: s.after, note: note, trailing: trailing, stories: st, tags: [], retro: s.isRetrospective,
+                                 value: s.after, note: note, trailing: trailing, stories: st, tags: [], retro: s.isRetrospective, edited: s.meta.editedAt,
                                  haystack: hay([Kind.session.title, title, s.notes ?? ""] + st)))
+        }
+        for w in a.smallWins {
+            let st = names(w.historyIDs)
+            out.append(DiaryItem(id: w.meta.id, kind: .win, date: w.occurredAt, day: LocalDay(date: w.occurredAt, zoneID: w.zoneID),
+                                 value: nil, note: w.text, trailing: "", stories: st, tags: [], retro: w.isRetrospective,
+                                 edited: w.meta.editedAt, haystack: hay([Kind.win.title, w.text] + st)))
         }
         return out.sorted { $0.date < $1.date }
     }

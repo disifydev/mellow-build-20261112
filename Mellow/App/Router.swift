@@ -41,6 +41,25 @@ enum SheetRoute: Identifiable {
     case summary
     case newLetter
     case message(String, String)
+    // Правка сохранённых записей: та же форма, что при создании, но заполненная.
+    case editCheckIn(UUID)
+    case editEpisode(UUID)
+    case editConversation(UUID)
+    case editSession(UUID)
+    case editWin(UUID)
+    case editStory(UUID)
+    case editLetter(UUID)
+
+    /// Форма правки для строки дневника.
+    static func edit(_ item: DiaryItem) -> SheetRoute {
+        switch item.kind {
+        case .checkIn: return .editCheckIn(item.id)
+        case .episode: return .editEpisode(item.id)
+        case .conversation: return .editConversation(item.id)
+        case .session: return .editSession(item.id)
+        case .win: return .editWin(item.id)
+        }
+    }
 
     var id: String {
         switch self {
@@ -58,6 +77,13 @@ enum SheetRoute: Identifiable {
         case .summary: return "summary"
         case .newLetter: return "newLetter"
         case .message(let text, _): return "message-\(text.hashValue)"
+        case .editCheckIn(let id): return "editCheckIn-\(id.uuidString)"
+        case .editEpisode(let id): return "editEpisode-\(id.uuidString)"
+        case .editConversation(let id): return "editConversation-\(id.uuidString)"
+        case .editSession(let id): return "editSession-\(id.uuidString)"
+        case .editWin(let id): return "editWin-\(id.uuidString)"
+        case .editStory(let id): return "editStory-\(id.uuidString)"
+        case .editLetter(let id): return "editLetter-\(id.uuidString)"
         }
     }
 
@@ -97,4 +123,6 @@ final class Router: ObservableObject {
     @Published var cover: CoverRoute?
     @Published var practiceGroup: PracticeGroup = .breath
     @Published var diaryDay: LocalDay?
+    /// День, выбранный в дневнике: новые записи из «+» по умолчанию попадают в него (задним числом).
+    @Published var composeDay: LocalDay?
 }

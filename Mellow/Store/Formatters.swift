@@ -53,6 +53,13 @@ enum Fmt {
         return String(first).uppercased() + s.dropFirst()
     }
 
+    /// «изменено 14:20» сегодня, иначе «изменено 10 нояб., 14:20».
+    static func edited(_ date: Date) -> String {
+        let t = time.string(from: date)
+        if Cal.current.isDateInToday(date) { return "изменено \(t)" }
+        return "изменено \(dayMonthShort.string(from: date)), \(t)"
+    }
+
     /// «Сегодня, 20:14», «Вчера, 22:40», «10 нояб., 08:15».
     static func relative(_ date: Date) -> String {
         let cal = Cal.current

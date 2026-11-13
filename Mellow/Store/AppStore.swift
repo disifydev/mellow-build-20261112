@@ -12,13 +12,19 @@ final class AppStore: ObservableObject {
     /// Необязательный вход через Apple (см. AppleAccount.swift).
     @Published var appleUserID: String? = nil
     @Published var appleName: String? = nil
+    /// Плашка «Удалено · Отменить» после удаления (см. AppStore+Editing.swift).
+    @Published var toast: UndoToast? = nil
+    /// Черновик несохранённого эпизода.
+    @Published var episodeDraft: EpisodeDraft? = nil
+    var pendingUndo: PendingUndo?
+    var purgeTask: Task<Void, Never>?
 
     private(set) var active: Snapshot
     private(set) var dayStats: [LocalDay: DayStats]
     private(set) var diary: [DiaryItem]
 
     let isDemo: Bool
-    private let fileURL: URL
+    let fileURL: URL
     private var saveTask: Task<Void, Never>?
 
     init(demo: Bool) {
@@ -49,6 +55,8 @@ final class AppStore: ObservableObject {
         level = lastLevelToday() ?? 3
         if awardedAtLaunch { scheduleSave() }
         if Features.appleSignIn { loadAppleAccount() }
+        loadEpisodeDraft()
+        if !demo { Notifier.cancelLetters(ids: s.letters.filter { $0.meta.isDeleted }.map { $0.meta.id }) }
     }
 
     // MARK: Время и пояс
@@ -152,7 +160,7 @@ final class AppStore: ObservableObject {
         apply(s)
     }
 
-    private func apply(_ new: Snapshot) {
+    func apply(_ new: Snapshot) {
         var s = new
         AppStore.award(&s)
         let a = s.active()
@@ -163,8 +171,10 @@ final class AppStore: ObservableObject {
         scheduleSave()
     }
 
+    /// Тихое удаление без плашки «Отменить»: сразу надгробие (например, слишком короткая сессия практики).
     func softDelete<R: Record>(_ keyPath: WritableKeyPath<Snapshot, [R]>, id: UUID) {
-        update(keyPath, id: id) { $0.meta.deletedAt = Date() }
+        let (d, affected) = Deletion.delete([id], in: snapshot, now: Date())
+        apply(d.purgingDeleted(ids: affected))
     }
 
     func update<R: Record>(_ keyPath: WritableKeyPath<Snapshot, [R]>, id: UUID, _ change: (inout R) -> Void) {
@@ -192,8 +202,9 @@ final class AppStore: ObservableObject {
     // MARK: Создание записей
 
     @discardableResult
-    func addCheckIn(anxiety: Int, note: String?, at date: Date = Date(), tags: [String] = [], historyIDs: [UUID] = []) -> UUID {
+    func addCheckIn(anxiety: Int, note: String?, at eventDate: Date = Date(), tags: [String] = [], historyIDs: [UUID] = []) -> UUID {
         let m = meta()
+        let date = DefaultTime.clampToNow(eventDate, now: m.createdAt)
         let rec = CheckInRecord(meta: m, observedAt: date, zoneID: zone,
                                 isRetrospective: RetrospectiveRule.isRetrospective(eventAt: date, createdAt: m.createdAt),
                                 anxiety: AnxietyScale.clamp(anxiety), note: note?.nilIfEmpty, tags: tags, historyIDs: historyIDs)
@@ -237,18 +248,29 @@ final class AppStore: ObservableObject {
             var id = m.id
             if let existing, let i = s.dayReflections.firstIndex(where: { $0.meta.id == existing.meta.id }) {
                 id = existing.meta.id
+                let before = s.dayReflections[i]
                 s.dayReflections[i].overallAnxiety = overall
                 s.dayReflections[i].helped = helped.nilIfEmpty
                 s.dayReflections[i].hard = hard.nilIfEmpty
                 s.dayReflections[i].victory = victory.nilIfEmpty
                 s.dayReflections[i].summary = summary.nilIfEmpty
+                guard s.dayReflections[i] != before else { return }
                 s.dayReflections[i].meta.updatedAt = Date()
+                s.dayReflections[i].meta.editedAt = Date()
             } else {
                 s.dayReflections.append(DayReflectionRecord(meta: m, localDate: day.description, zoneID: zoneID, overallAnxiety: overall,
                                                             helped: helped.nilIfEmpty, hard: hard.nilIfEmpty,
                                                             victory: victory.nilIfEmpty, summary: summary.nilIfEmpty))
             }
-            guard let text = victory.nilIfEmpty else { return }
+            guard let text = victory.nilIfEmpty else {
+                // Победу из итога стёрли — убираем и её запись в списке побед.
+                for w in s.smallWins.indices where s.smallWins[w].dayReflectionID == id && !s.smallWins[w].meta.isDeleted {
+                    s.smallWins[w].meta.deletedAt = Date()
+                    s.smallWins[w].meta.updatedAt = Date()
+                    s.smallWins[w] = s.smallWins[w].tombstoned()
+                }
+                return
+            }
             if let w = s.smallWins.firstIndex(where: { $0.dayReflectionID == id && !$0.meta.isDeleted }) {
                 s.smallWins[w].text = text
                 s.smallWins[w].meta.updatedAt = Date()
@@ -261,9 +283,12 @@ final class AppStore: ObservableObject {
         }
     }
 
-    func addWin(_ text: String, historyIDs: [UUID] = []) {
+    func addWin(_ text: String, historyIDs: [UUID] = [], at eventDate: Date = Date()) {
         guard let t = text.nilIfEmpty else { return }
-        let rec = SmallWinRecord(meta: meta(), text: t, occurredAt: Date(), zoneID: zone, historyIDs: historyIDs)
+        let m = meta()
+        let date = DefaultTime.clampToNow(eventDate, now: m.createdAt)
+        let rec = SmallWinRecord(meta: m, text: t, occurredAt: date, zoneID: zone,
+                                 isRetrospective: RetrospectiveRule.isRetrospective(eventAt: date, createdAt: m.createdAt), historyIDs: historyIDs)
         mutate { $0.smallWins.append(rec) }
     }
 
@@ -358,6 +383,10 @@ final class AppStore: ObservableObject {
     /// Полное удаление всех данных. Встроенные практики создаются заново.
     func wipe() {
         saveTask?.cancel()
+        purgeTask?.cancel()
+        pendingUndo = nil
+        toast = nil
+        discardEpisodeDraft()
         AppStore.removeExportFiles()
         AppStore.removeFiles(in: fileURL.deletingLastPathComponent(), prefix: "mellow-broken-")
         var s = Snapshot()
@@ -424,6 +453,8 @@ final class AppStore: ObservableObject {
     /// Встроенные практики, настройки, дубли, брошенные сессии.
     private static func normalize(_ s: inout Snapshot) {
         let now = Date()
+        // Удалённые записи хранятся только надгробиями: текст стирается (если приложение закрыли во время «Отменить»).
+        s = s.purgingDeleted()
         // Сессия, которая «ещё идёт» после перезапуска, была прервана.
         for i in s.sessions.indices where s.sessions[i].status == .running {
             s.sessions[i].status = .interrupted

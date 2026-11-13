@@ -14,6 +14,8 @@ struct RootView: View {
                     .padding(.horizontal, 14)
                     .padding(.bottom, 2)
                     .ignoresSafeArea(.keyboard, edges: .bottom)
+                UndoToastBar()
+                    .padding(.bottom, 84)
             }
         }
         .modifier(SheetHost(sheet: $router.sheet))
@@ -75,8 +77,15 @@ struct RootView: View {
         case "letters": router.cover = .letters
         case "month": router.cover = .month
         case "help": router.cover = .help
-        case "story":
+        case "story", "story-delete":
             if let h = store.histories.first { router.cover = .story(h.meta.id) }
+        case "edit-checkin":
+            router.tab = .diary
+            if let c = store.diary.last(where: { $0.kind == .checkIn && $0.day == store.today }) { router.sheet = .editCheckIn(c.id) }
+        case "diary-swipe", "diary-select": router.tab = .diary
+        case "diary-undo":
+            router.tab = .diary
+            if let e = store.diary.last(where: { $0.kind == .episode && $0.day == store.today }) { store.delete([e.id]) }
         default: break
         }
     }
@@ -92,6 +101,7 @@ struct SheetHost: ViewModifier {
         content.sheet(item: $sheet) { route in
             Themed {
                 SheetBody(route: route, sheet: $sheet)
+                    .overlay(alignment: .bottom) { UndoToastBar().padding(.bottom, 12) }
             }
             .environmentObject(store)
             .environmentObject(router)
@@ -122,6 +132,13 @@ struct SheetBody: View {
         case .summary: SummarySheet()
         case .newLetter: NewLetterSheet()
         case .message(let text, let cat): MessageSheet(text: text, cat: cat)
+        case .editCheckIn(let id): CheckInSheet(editID: id)
+        case .editEpisode(let id): EpisodeSheet(historyID: nil, editID: id)
+        case .editConversation(let id): ConversationSheet(historyID: nil, editID: id)
+        case .editSession(let id): SessionEditSheet(sessionID: id)
+        case .editWin(let id): AddWinSheet(historyID: nil, editID: id)
+        case .editStory(let id): NewStorySheet(editID: id)
+        case .editLetter(let id): NewLetterSheet(editID: id)
         }
     }
 }
@@ -136,6 +153,7 @@ struct CoverHost: ViewModifier {
         content.fullScreenCover(item: $cover) { route in
             Themed {
                 CoverBody(route: route)
+                    .overlay(alignment: .bottom) { UndoToastBar().padding(.bottom, 12) }
             }
             .environmentObject(store)
             .environmentObject(router)

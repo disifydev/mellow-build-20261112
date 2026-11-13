@@ -19,7 +19,7 @@ struct MellowApp: App {
                 .environmentObject(router)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { store.saveNow() }
+            if phase == .background { store.enterBackground() } else if phase != .active { store.saveNow() }
         }
     }
 

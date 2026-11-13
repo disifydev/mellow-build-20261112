@@ -19,6 +19,7 @@ struct StoryDetailView: View {
     @State private var cover: CoverRoute?
     @State private var newGoal = ""
     @State private var askGoal = false
+    @State private var askDelete = false
 
     var body: some View {
         Group {
@@ -34,6 +35,24 @@ struct StoryDetailView: View {
         }
         .modifier(SheetHost(sheet: $sheet))
         .modifier(CoverHost(cover: $cover))
+        .onAppear {
+            if Launch.screen == "story-delete" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { askDelete = true }
+            }
+        }
+        .confirmationDialog("Удалить историю «\(store.history(historyID)?.title ?? "")»?", isPresented: $askDelete, titleVisibility: .visible) {
+            Button("Удалить только историю", role: .destructive) {
+                store.deleteHistory(historyID, withRecords: false)
+                dismiss()
+            }
+            Button("Удалить вместе с записями", role: .destructive) {
+                store.deleteHistory(historyID, withRecords: true)
+                dismiss()
+            }
+            Button("Отмена", role: .cancel) {}
+        } message: {
+            Text("Только история — записи (\(linkedCount)) останутся в дневнике без привязки. Вместе с записями — удалятся и они. Это можно отменить в течение 5 секунд.")
+        }
         .alert("Новая цель", isPresented: $askGoal) {
             TextField("Например: реже проверять телефон", text: $newGoal)
             Button("Добавить") {
@@ -53,8 +72,20 @@ struct StoryDetailView: View {
             HStack {
                 RoundButton(icon: "chevron.left", label: "Назад") { dismiss() }
                 Spacer()
+                Menu {
+                    Button { sheet = .editStory(h.meta.id) } label: { Label("Изменить", systemImage: "pencil") }
+                    Button(role: .destructive) { askDelete = true } label: { Label("Удалить историю", systemImage: "trash") }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(pal.fg)
+                        .frame(width: 44, height: 44)
+                        .glass(22)
+                }
+                .accessibilityLabel("Действия с историей")
             }
             BigHeader(title: h.title, subtitle: "с \(Fmt.dayMonth.string(from: h.startedAt))", size: 31)
+            if let details = h.details { Cap(details) }
             SegControl(items: HistoryStatus.allCases.map { ($0, $0.title) },
                        selection: Binding(get: { h.status }, set: { store.setStatus($0, historyID: h.meta.id) }))
             HStack(spacing: 8) {
@@ -79,6 +110,16 @@ struct StoryDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }
+    }
+
+    /// Сколько записей привязано к истории (для подсказки в диалоге удаления).
+    private var linkedCount: Int {
+        let a = store.active
+        return a.checkIns.filter { $0.historyIDs.contains(historyID) }.count
+            + a.episodes.filter { $0.historyIDs.contains(historyID) }.count
+            + a.conversations.filter { $0.historyIDs.contains(historyID) }.count
+            + a.sessions.filter { $0.historyIDs.contains(historyID) }.count
+            + a.smallWins.filter { $0.historyIDs.contains(historyID) }.count
     }
 
     private func kpi(_ value: Int, _ caption: String) -> some View {
@@ -148,6 +189,7 @@ struct StoryDetailView: View {
             }
             ForEach(Array(talks.prefix(5).enumerated()), id: \.offset) { i, t in
                 if i > 0 { Sep() }
+                Button { sheet = .editConversation(t.meta.id) } label: {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Lab(Fmt.dayMonthShort.string(from: t.occurredAt))
@@ -159,6 +201,10 @@ struct StoryDetailView: View {
                     }
                     Cap(t.summary ?? t.insights ?? "Без описания")
                 }
+                .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Изменить разговор")
             }
         }
         .card()
@@ -239,7 +285,9 @@ struct StoryDetailView: View {
                 Cap("Здесь появятся победы, связанные с этой историей.")
             }
             ForEach(wins, id: \.meta.id) { w in
-                WinRow(text: w.text)
+                Button { sheet = .editWin(w.meta.id) } label: { WinRow(text: w.text).contentShape(Rectangle()) }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Изменить победу")
             }
         }
         .card()
@@ -247,47 +295,43 @@ struct StoryDetailView: View {
 }
 
 /// Цель с этапами: этапы отмечаются, новый этап добавляется строкой.
+/// Цель можно переименовать и удалить, этап — изменить, переставить и удалить (удержание).
 struct GoalCard: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.palette) private var pal
     let goal: GoalRecord
     @State private var newStep = ""
     @State private var burst = 0
+    @State private var renamingGoal = false
+    @State private var renamingStep: GoalStepRecord?
+    @State private var editText = ""
 
     var body: some View {
-        let steps = store.active.goalSteps.filter { $0.goalID == goal.meta.id }.sorted { $0.order < $1.order }
+        let steps = store.active.goalSteps.filter { $0.goalID == goal.meta.id }.sorted { ($0.order, $0.meta.createdAt) < ($1.order, $1.meta.createdAt) }
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: "flag").font(.system(size: 17, weight: .medium))
                 H(goal.title)
                 Spacer(minLength: 0)
                 if goal.state == .done { Chip(text: "выполнена", height: 26) }
-            }
-            ForEach(steps, id: \.meta.id) { s in
-                Button {
-                    if !s.isDone { burst += 1 }
-                    store.toggleStep(s.meta.id)
-                    Haptics.tick(store.settings.hapticsEnabled)
+                Menu {
+                    Button {
+                        editText = goal.title
+                        renamingGoal = true
+                    } label: { Label("Изменить цель", systemImage: "pencil") }
+                    Button(role: .destructive) {
+                        store.delete([goal.meta.id], label: "Цель удалена")
+                    } label: { Label("Удалить цель", systemImage: "trash") }
                 } label: {
-                    HStack(spacing: 10) {
-                        ZStack {
-                            Circle().fill(s.isDone ? Theme.mint : Color.clear)
-                            Circle().strokeBorder(s.isDone ? Color.clear : pal.fg2, lineWidth: 1.5)
-                            if s.isDone {
-                                Image(systemName: "checkmark").font(.system(size: 10, weight: .heavy)).foregroundStyle(Theme.ink)
-                            }
-                        }
-                        .frame(width: 22, height: 22)
-                        Text(s.title).txt(14.5).strikethrough(s.isDone).opacity(s.isDone ? 0.55 : 1)
-                            .multilineTextAlignment(.leading)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.vertical, 5)
-                    .contentShape(Rectangle())
+                    Image(systemName: "ellipsis").font(.system(size: 15, weight: .semibold)).frame(width: 30, height: 30)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(s.title)
-                .accessibilityValue(s.isDone ? "выполнен" : "не выполнен")
+                .accessibilityLabel("Действия с целью")
+            }
+            ForEach(Array(steps.enumerated()), id: \.element.meta.id) { index, s in
+                stepRow(s, index: index, count: steps.count)
+            }
+            if steps.count > 1 {
+                Cap("Удерживай этап, чтобы изменить, переставить или удалить.")
             }
             HStack(spacing: 8) {
                 TextField("", text: $newStep, prompt: Text("Новый этап").foregroundColor(pal.fg2))
@@ -308,6 +352,66 @@ struct GoalCard: View {
         .overlay {
             if burst > 0 { StarBurst().id(burst) }
         }
+        .alert("Цель", isPresented: $renamingGoal) {
+            TextField("Название цели", text: $editText)
+            Button("Сохранить") { store.renameGoal(goal.meta.id, title: editText) }
+            Button("Отмена", role: .cancel) {}
+        }
+        .alert("Этап", isPresented: Binding(get: { renamingStep != nil }, set: { if !$0 { renamingStep = nil } })) {
+            TextField("Название этапа", text: $editText)
+            Button("Сохранить") {
+                if let s = renamingStep { store.renameStep(s.meta.id, title: editText) }
+                renamingStep = nil
+            }
+            Button("Отмена", role: .cancel) { renamingStep = nil }
+        }
+    }
+
+    private func stepRow(_ s: GoalStepRecord, index: Int, count: Int) -> some View {
+        Button {
+            if !s.isDone { burst += 1 }
+            store.toggleStep(s.meta.id)
+            Haptics.tick(store.settings.hapticsEnabled)
+        } label: {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().fill(s.isDone ? Theme.mint : Color.clear)
+                    Circle().strokeBorder(s.isDone ? Color.clear : pal.fg2, lineWidth: 1.5)
+                    if s.isDone {
+                        Image(systemName: "checkmark").font(.system(size: 10, weight: .heavy)).foregroundStyle(Theme.ink)
+                    }
+                }
+                .frame(width: 22, height: 22)
+                Text(s.title).txt(14.5).strikethrough(s.isDone).opacity(s.isDone ? 0.55 : 1)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                editText = s.title
+                renamingStep = s
+            } label: { Label("Изменить", systemImage: "pencil") }
+            if index > 0 {
+                Button { store.moveStep(s.meta.id, by: -1) } label: { Label("Выше", systemImage: "arrow.up") }
+            }
+            if index < count - 1 {
+                Button { store.moveStep(s.meta.id, by: 1) } label: { Label("Ниже", systemImage: "arrow.down") }
+            }
+            Button(role: .destructive) { store.deleteStep(s.meta.id) } label: { Label("Удалить этап", systemImage: "trash") }
+        }
+        .accessibilityLabel(s.title)
+        .accessibilityValue(s.isDone ? "выполнен" : "не выполнен")
+        .accessibilityAction(named: "Изменить") {
+            editText = s.title
+            renamingStep = s
+        }
+        .accessibilityAction(named: "Выше") { store.moveStep(s.meta.id, by: -1) }
+        .accessibilityAction(named: "Ниже") { store.moveStep(s.meta.id, by: 1) }
+        .accessibilityAction(named: "Удалить") { store.deleteStep(s.meta.id) }
     }
 
     private func addStep() {

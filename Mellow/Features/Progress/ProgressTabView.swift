@@ -356,9 +356,11 @@ struct ProgressTabView: View {
             }
             ForEach(wins, id: \.meta.id) { w in
                 HStack(spacing: 4) {
-                    WinRow(text: w.text)
+                    Button { router.sheet = .editWin(w.meta.id) } label: { WinRow(text: w.text).contentShape(Rectangle()) }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Изменить победу")
                     Button {
-                        store.softDelete(\Snapshot.smallWins, id: w.meta.id)
+                        store.delete([w.meta.id])
                     } label: {
                         Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).opacity(0.4).frame(width: 30, height: 30)
                     }

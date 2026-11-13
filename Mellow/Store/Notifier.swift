@@ -47,6 +47,23 @@ enum Notifier {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [letterID(id)])
     }
 
+    static func cancelLetters(ids: [UUID]) {
+        guard !ids.isEmpty else { return }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ids.map(letterID))
+    }
+
+    /// Новая дата письма: напоминание переносится, только если оно было включено.
+    static func rescheduleLetterIfPending(id: UUID, at date: Date) {
+        let key = letterID(id)
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            guard requests.contains(where: { $0.identifier == key }) else { return }
+            DispatchQueue.main.async {
+                cancelLetter(id: id)
+                scheduleLetter(id: id, at: date)
+            }
+        }
+    }
+
     static func cancelAll() {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }

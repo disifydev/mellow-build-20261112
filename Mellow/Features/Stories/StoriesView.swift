@@ -114,49 +114,101 @@ struct StoryCard: View {
     }
 }
 
-/// Новая история.
+/// Новая история или правка: название, описание, дата начала.
 struct NewStorySheet: View {
     @EnvironmentObject private var store: AppStore
     @Environment(\.dismiss) private var dismiss
+    var editID: UUID? = nil
     @State private var title = ""
     @State private var details = ""
     @State private var start = Date()
+    @State private var loaded = false
+
+    private var record: HistoryRecord? { editID.flatMap { store.history($0) } }
 
     var body: some View {
         SheetScroll {
-            BigHeader(title: "Новая история", subtitle: "тема, которая повторяется", size: 30)
+            BigHeader(title: editID == nil ? "Новая история" : "История",
+                      subtitle: editID == nil ? "тема, которая повторяется" : "изменить", size: 30)
             MField(title: "Название", text: $title, placeholder: "Например: волнение перед встречами")
             MField(title: "Описание", text: $details, placeholder: "Как это обычно происходит", lines: 3)
             DateRow(title: "Когда началась", date: $start, components: [.date])
-            CTAButton(title: "Создать историю") {
+            CTAButton(title: editID == nil ? "Создать историю" : "Сохранить изменения") {
                 guard let t = title.nilIfEmpty else { return }
-                store.addHistory(title: t, details: details, startedAt: start)
+                if let r = record {
+                    store.updateHistory(id: r.meta.id, title: t, details: details, startedAt: start)
+                } else {
+                    store.addHistory(title: t, details: details, startedAt: start)
+                }
                 dismiss()
             }
             .opacity(title.trimmed.isEmpty ? 0.5 : 1)
-            Cap("Старые записи можно добавить задним числом — они будут помечены.")
+            if let r = record {
+                EditedNote(date: r.meta.editedAt)
+                Cap("Статус меняется на экране истории. Удалить историю можно там же, в меню «•••».")
+            } else {
+                Cap("Старые записи можно добавить задним числом — они будут помечены.")
+            }
+        }
+        .onAppear {
+            guard !loaded else { return }
+            loaded = true
+            guard let r = record else { return }
+            title = r.title
+            details = r.details ?? ""
+            start = r.startedAt
         }
     }
 }
 
-/// Маленькая победа.
+/// Маленькая победа: создание и правка (текст, дата и время).
 struct AddWinSheet: View {
     @EnvironmentObject private var store: AppStore
+    @EnvironmentObject private var router: Router
     @Environment(\.dismiss) private var dismiss
     let historyID: UUID?
+    var editID: UUID? = nil
     @State private var text = ""
+    @State private var date = Date()
+    @State private var loaded = false
+
+    private var record: SmallWinRecord? {
+        editID.flatMap { id in store.active.smallWins.first { $0.meta.id == id } }
+    }
 
     var body: some View {
         SheetScroll {
-            BigHeader(title: "Победа", subtitle: "даже маленькая", size: 30)
+            BigHeader(title: "Победа", subtitle: editID == nil ? "даже маленькая" : "изменить", size: 30)
             MField(title: "Что получилось", text: $text, placeholder: "Отметила своё состояние сегодня", lines: 2)
-            CTAButton(title: "Сохранить") {
+            DateRow(title: "Когда", date: $date)
+            CTAButton(title: editID == nil ? "Сохранить" : "Сохранить изменения") {
                 guard text.nilIfEmpty != nil else { return }
-                store.addWin(text, historyIDs: historyID.map { [$0] } ?? [])
-                Haptics.success(store.settings.hapticsEnabled)
+                if let r = record {
+                    store.updateWin(id: r.meta.id, text: text, date: date, historyIDs: r.historyIDs)
+                } else {
+                    store.addWin(text, historyIDs: historyID.map { [$0] } ?? [], at: date)
+                    Haptics.success(store.settings.hapticsEnabled)
+                }
                 dismiss()
             }
             .opacity(text.trimmed.isEmpty ? 0.5 : 1)
+            if let r = record {
+                EditedNote(date: r.meta.editedAt)
+                DeleteRecordButton(title: "Удалить победу") {
+                    store.delete([r.meta.id])
+                    dismiss()
+                }
+            }
+        }
+        .onAppear {
+            guard !loaded else { return }
+            loaded = true
+            if let r = record {
+                text = r.text
+                date = r.occurredAt
+            } else {
+                date = defaultEventDate(store, router)
+            }
         }
     }
 }
