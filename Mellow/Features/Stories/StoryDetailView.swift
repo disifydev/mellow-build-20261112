@@ -115,11 +115,13 @@ struct StoryDetailView: View {
     /// Сколько записей привязано к истории (для подсказки в диалоге удаления).
     private var linkedCount: Int {
         let a = store.active
-        return a.checkIns.filter { $0.historyIDs.contains(historyID) }.count
-            + a.episodes.filter { $0.historyIDs.contains(historyID) }.count
-            + a.conversations.filter { $0.historyIDs.contains(historyID) }.count
-            + a.sessions.filter { $0.historyIDs.contains(historyID) }.count
-            + a.smallWins.filter { $0.historyIDs.contains(historyID) }.count
+        let id = historyID
+        let checkIns: Int = a.checkIns.filter { $0.historyIDs.contains(id) }.count
+        let episodes: Int = a.episodes.filter { $0.historyIDs.contains(id) }.count
+        let talks: Int = a.conversations.filter { $0.historyIDs.contains(id) }.count
+        let sessions: Int = a.sessions.filter { $0.historyIDs.contains(id) }.count
+        let wins: Int = a.smallWins.filter { $0.historyIDs.contains(id) }.count
+        return checkIns + episodes + talks + sessions + wins
     }
 
     private func kpi(_ value: Int, _ caption: String) -> some View {

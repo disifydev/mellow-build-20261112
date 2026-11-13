@@ -4,9 +4,15 @@ import PivchikDomain
 enum AppTab: String, CaseIterable, Hashable {
     case home, diary, stories, practice, progress
 
+    /// Вкладки в нижней панели. Истории открываются из дневника.
+    static let bar: [AppTab] = [.home, .diary, .practice, .progress]
+
+    /// Какая вкладка подсвечена в панели.
+    var barTab: AppTab { self == .stories ? .diary : self }
+
     var title: String {
         switch self {
-        case .home: return "Главная"
+        case .home: return "Сегодня"
         case .diary: return "Дневник"
         case .stories: return "Истории"
         case .practice: return "Практики"

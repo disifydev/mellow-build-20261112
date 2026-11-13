@@ -135,7 +135,7 @@ jobs:
           shoot 32-progress-filter -seedDemo -screen progress-filter -tod day
           shoot 00-empty-home -tod day
           shoot 01-home -seedDemo -screen home -tod day
-          shoot 02-home-chart -seedDemo -screen home -tod day -anchor chart
+          shoot 02-home-evening-card -seedDemo -screen home -tod day -anchor evening
           shoot 03-home-evening -seedDemo -screen home -tod eve
           shoot 04-diary -seedDemo -screen diary -tod day
           shoot 05-diary-timeline -seedDemo -screen diary -tod day -anchor timeline

@@ -7,10 +7,10 @@ struct TabBar: View {
 
     var body: some View {
         GeometryReader { geo in
-            let unit = (geo.size.width - 10) / 6.1
+            let unit = (geo.size.width - 10) / CGFloat(AppTab.bar.count)
             HStack(spacing: 0) {
-                ForEach(AppTab.allCases, id: \.self) { tab in
-                    item(tab, width: router.tab == tab ? unit * 2.1 : unit)
+                ForEach(AppTab.bar, id: \.self) { tab in
+                    item(tab, width: unit)
                 }
             }
             .padding(5)
@@ -20,21 +20,19 @@ struct TabBar: View {
     }
 
     private func item(_ tab: AppTab, width: CGFloat) -> some View {
-        let on = router.tab == tab
+        let on = router.tab.barTab == tab
         return Button {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) { router.tab = tab }
         } label: {
-            HStack(spacing: 6) {
+            VStack(spacing: 3) {
                 Image(systemName: tab.icon).font(.system(size: 17, weight: .semibold))
-                if on {
-                    Text(tab.title).txt(12, .semibold).lineLimit(1).minimumScaleFactor(0.7)
-                }
+                Text(tab.title).txt(11, .semibold).lineLimit(1).minimumScaleFactor(0.7)
             }
             .foregroundStyle(on ? pal.onFg : pal.fg)
             .frame(width: max(0, width), height: 54)
             .background {
                 if on {
-                    Capsule().fill(pal.on).shadow(color: pal.shadow, radius: 7, x: 0, y: 6)
+                    RoundedRectangle(cornerRadius: 27, style: .continuous).fill(pal.on).shadow(color: pal.shadow, radius: 7, x: 0, y: 6)
                 }
             }
             .contentShape(Rectangle())

@@ -14,6 +14,7 @@ struct StoriesView: View {
     var body: some View {
         TabScroll {
             BigHeader(title: "Истории", subtitle: "это путь") {
+                RoundButton(icon: "chevron.left", label: "Назад в дневник") { withAnimation { router.tab = .diary } }
                 RoundButton(icon: "plus", label: "Новая история") { router.sheet = .newStory }
             }
             HScroll {
@@ -123,6 +124,8 @@ struct NewStorySheet: View {
     @State private var details = ""
     @State private var start = Date()
     @State private var loaded = false
+
+    init(editID: UUID? = nil) { self.editID = editID }
 
     private var record: HistoryRecord? { editID.flatMap { store.history($0) } }
 

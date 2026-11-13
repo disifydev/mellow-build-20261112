@@ -5,9 +5,6 @@ struct HomeView: View {
     @EnvironmentObject private var store: AppStore
     @EnvironmentObject private var router: Router
     @Environment(\.palette) private var pal
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var feel: String?
-    @State private var selectedBead: Int?
 
     private var info: LevelInfo { LevelInfo.of(store.level) }
 
@@ -17,17 +14,10 @@ struct HomeView: View {
                 RoundButton(icon: "person", label: "Профиль и настройки") { router.cover = .profile }
             }
             stage
-            feelings
             CTAButton(title: "Отметить состояние", trailingIcon: "arrow.right", action: mark)
             quickActions
-            ChartCard(title: "Тревога за 7 дней", points: store.dayPoints(from: store.today.adding(days: -6), to: store.today),
-                      delta: store.weekDelta(), selected: $selectedBead)
-                .id("chart")
-            weekCard.id("week")
-            winsCard.id("wins")
             eveningCard.id("evening")
         }
-        .onChange(of: store.level) { _, _ in feel = nil }
     }
 
     // MARK: Шкала с цифрой
@@ -54,21 +44,10 @@ struct HomeView: View {
         .padding(.vertical, -8)
     }
 
-    private var feelings: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Cap("Что ближе всего?")
-            HScroll {
-                ForEach(info.feels, id: \.self) { f in
-                    Chip(text: f, isOn: feel == f) { feel = feel == f ? nil : f }
-                }
-            }
-        }
-    }
 
     private func mark() {
-        store.addCheckIn(anxiety: store.level, note: feel ?? info.name)
+        store.addCheckIn(anxiety: store.level, note: info.name)
         Haptics.success(store.settings.hapticsEnabled)
-        feel = nil
         router.diaryDay = store.today
         withAnimation { router.tab = .diary }
     }
@@ -103,49 +82,7 @@ struct HomeView: View {
         .buttonStyle(PressStyle())
     }
 
-    // MARK: Неделя, победы, итог дня
-
-    private var weekCard: some View {
-        let start = store.today.weekStart
-        let end = start.adding(days: 6)
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                H(Fmt.capitalized(Fmt.month.string(from: store.today.noon)))
-                Spacer()
-                Cap(start.month == end.month ? "\(start.day)–\(end.day)" : "\(start.shortTitle) – \(end.shortTitle)")
-            }
-            WeekStrip(start: start, selected: store.today) { day in
-                router.diaryDay = day
-                withAnimation { router.tab = .diary }
-            }
-        }
-        .card()
-    }
-
-    private var winsCard: some View {
-        let wins = Array(store.wins.prefix(2))
-        return VStack(alignment: .leading, spacing: 4) {
-            Button {
-                withAnimation { router.tab = .progress }
-            } label: {
-                HStack {
-                    H("Маленькие победы")
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .bold)).opacity(0.6)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            if wins.isEmpty {
-                Cap("Пока нет побед. Даже одна отметка состояния — уже шаг.")
-            } else {
-                ForEach(wins, id: \.meta.id) { w in
-                    WinRow(text: w.text)
-                }
-            }
-        }
-        .card()
-    }
+    // MARK: Итог дня
 
     private var eveningCard: some View {
         let done = store.reflection(on: store.today) != nil
