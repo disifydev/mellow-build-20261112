@@ -90,19 +90,34 @@ jobs:
             done
             return 1
           }
+          diagnose() { # почему снимок не удался: процессор, стек главного потока, журнал
+            local name="$1"
+            local PID=$(pgrep -f "Mellow.app/Mellow" | head -1)
+            echo "--- диагностика $name: pid=$PID"
+            if [ -n "$PID" ]; then
+              ps -o pid,%cpu,rss,stat,etime -p "$PID" || true
+              to 25 sample "$PID" 3 -file "shots/$name-sample.txt" >/dev/null 2>&1 || true
+              [ -f "shots/$name-sample.txt" ] && grep -A60 "Thread_.*DispatchQueue_1: com.apple.main-thread" "shots/$name-sample.txt" | cut -c1-200 | head -70
+            fi
+            to 20 xcrun simctl io "$UDID" screenshot "shots/$name-late.png" 2>&1 | tail -3 || true
+            to 30 xcrun simctl spawn "$UDID" log show --last 2m --style compact --predicate 'process == "Mellow"' 2>/dev/null | tail -40 > "shots/$name-log.txt" || true
+            tail -25 "shots/$name-log.txt" || true
+          }
           shoot() { # имя, аргументы запуска
             local name="$1"; shift
             if to 60 xcrun simctl launch --terminate-running-process "$UDID" "$BUNDLE_ID" "$@" >/dev/null; then
               for i in $(seq 1 10); do alive && break; sleep 1; done
               sleep 4
             fi
-            if to 15 xcrun simctl io "$UDID" screenshot "shots/$name.png" >/dev/null 2>&1 && sleep 2 && alive; then
+            if to 30 xcrun simctl io "$UDID" screenshot "shots/$name.png" >"shots/.err" 2>&1 && sleep 2 && alive; then
               echo "ok   $name"
             else
               [ -f "shots/$name.png" ] && mv "shots/$name.png" "shots/$name-CRASH.png"
-              echo "FAIL $name — приложение не работает (упало)"; FAIL=1
+              echo "FAIL $name — приложение не работает (упало или зависло)"; FAIL=1
+              diagnose "$name"
             fi
           }
+          shoot 22-profile -seedDemo -screen profile -tod day
           shoot 00-empty-home -tod day
           shoot 01-home -seedDemo -screen home -tod day
           shoot 02-home-chart -seedDemo -screen home -tod day -anchor chart
@@ -125,13 +140,13 @@ jobs:
           shoot 19-progress -seedDemo -screen progress -tod day
           shoot 20-progress-causes -seedDemo -screen progress -tod day -anchor causes
           shoot 21-progress-achievements -seedDemo -screen progress -tod day -anchor achievements
-          shoot 22-profile -seedDemo -screen profile -tod day
           shoot 23-letters -seedDemo -screen letters -tod day
           shoot 24-month -seedDemo -screen month -tod day
           shoot 25-backup -seedDemo -screen backup -tod day
           shoot 26-empty-progress -screen progress -tod day
           shoot 27-empty-practice -screen practice -tod day
           # белый/пустой экран сжимается в крошечный PNG — такие снимки помечаем
+          rm -f shots/.err
           for f in shots/*.png; do
             SZ=$(stat -f%z "$f")
             if [ "$SZ" -lt 40000 ]; then echo "ПУСТОЙ ЭКРАН? $f ($SZ байт)"; FAIL=1; fi
